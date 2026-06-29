@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Calendario de tarjetas{% endblock %}
+{% block page_title %}Calendario de tarjetas{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="mb-2">
+        <a href="/tarjetas/" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i> Volver
+        </a>
+    </div>
+
+    <div>
+        <h2 class="text-2xl font-bold">Pagos y cuotas próximas</h2>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Resumen mes a mes de lo que toca pagar</p>
+    </div>
+
+    {% if months_list %}
+        <div class="space-y-4">
+            {% for m in months_list %}
+                <div class="card-padded">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">{{ m.month }}</h3>
+                        <div class="text-sm font-bold num">{{ m.total | clp }}</div>
+                    </div>
+                    <div class="space-y-2">
+                        {% for c in m.cards %}
+                            <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 bank-stripe"
+                                 style="--bank-color: {{ c.color or '#3b82f6' }};">
+                                <div>
+                                    <div class="text-sm font-medium">{{ c.card_name }}</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">{{ c.count }} cuota(s)</div>
+                                </div>
+                                <div class="text-sm font-bold num">{{ c.total | clp }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        {% with icon='calendar', title='Sin cuotas próximas', message='Cuando registres compras en cuotas con tus tarjetas aparecerán aquí.' %}
+            {% include 'partials/empty_state.html' %}
+        {% endwith %}
+    {% endif %}
+</div>
+{% endblock %}

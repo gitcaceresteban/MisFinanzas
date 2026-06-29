@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}{% if person %}Editar{% else %}Nueva{% endif %} persona{% endblock %}
+{% block page_title %}{% if person %}Editar{% else %}Nueva{% endif %} persona{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+    <div class="mb-6">
+        <a href="/personas/" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i> Volver
+        </a>
+    </div>
+
+    <form method="POST" class="card-padded space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Nombre</label>
+                <input type="text" name="name" required class="input"
+                       value="{{ person.name if person else '' }}" placeholder="Ej: María González">
+            </div>
+            <div>
+                <label class="label">Alias (opcional)</label>
+                <input type="text" name="alias" class="input"
+                       value="{{ person.alias if person else '' }}" placeholder="Mami, Pancho, etc.">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Teléfono</label>
+                <input type="tel" name="phone" class="input"
+                       value="{{ person.phone if person else '' }}" placeholder="+56 9 ...">
+            </div>
+            <div>
+                <label class="label">Email</label>
+                <input type="email" name="email" class="input"
+                       value="{{ person.email if person else '' }}">
+            </div>
+        </div>
+
+        <div>
+            <label class="label">Telegram ID (opcional)</label>
+            <input type="text" name="telegram_id" class="input"
+                   value="{{ person.telegram_id if person else '' }}" placeholder="Para notificarles automáticamente">
+        </div>
+
+        <div>
+            <label class="label">Notas</label>
+            <textarea name="notes" class="textarea" rows="3">{{ person.notes if person else '' }}</textarea>
+        </div>
+
+        <div class="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button type="submit" class="btn-primary">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>{{ 'Guardar' if person else 'Crear persona' }}</span>
+            </button>
+            <a href="/personas/" class="btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block title %}Cuentas{% endblock %}
+{% block page_title %}Cuentas{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-bold">Cuentas</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Saldo total activo: <span class="font-bold text-slate-900 dark:text-white num">{{ total | clp }}</span>
+            </p>
+        </div>
+        <a href="/cuentas/nueva" class="btn-primary">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Nueva cuenta</span>
+        </a>
+    </div>
+
+    {% if accounts %}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {% for a in accounts %}
+            <div class="card-padded bank-stripe" style="--bank-color: {{ a.bank_color or '#64748b' }};">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <div class="text-base font-semibold">{{ a.name }}</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">{{ a.bank_name or 'Sin banco' }}</div>
+                    </div>
+                    <span class="badge badge-{{ a.status | status_color }} capitalize">{{ a.status }}</span>
+                </div>
+                <div class="text-2xl font-bold num mb-3 {% if a.balance < 0 %}text-rose-600 dark:text-rose-400{% endif %}">
+                    {{ a.balance | clp }}
+                </div>
+                <div class="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-4">
+                    <span class="capitalize">{{ a.type }} · {{ a.currency }}</span>
+                    {% if a.credit_line %}<span>Línea: {{ a.credit_line | clp }}</span>{% endif %}
+                </div>
+                <div class="flex gap-2">
+                    <a href="/cuentas/{{ a.id }}/editar" class="btn-secondary flex-1 justify-center text-xs">
+                        <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                        Editar
+                    </a>
+                    <button type="button" class="btn-secondary px-3" onclick="document.getElementById('adjust-{{ a.id }}').showModal()" title="Ajustar saldo">
+                        <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+                    </button>
+                    {% if a.status != 'cerrada' %}
+                    <form action="/cuentas/{{ a.id }}/eliminar" method="POST"
+                          data-confirm="¿Cerrar la cuenta '{{ a.name }}'?">
+                        <button type="submit" class="btn-secondary px-3">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-500"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Modal ajuste de saldo -->
+            <dialog id="adjust-{{ a.id }}" class="rounded-2xl backdrop:bg-slate-900/60 p-0 max-w-md w-full bg-white dark:bg-slate-900">
+                <form method="POST" action="/cuentas/{{ a.id }}/ajustar-saldo" class="p-6 space-y-4">
+                    <h3 class="text-lg font-bold">Ajustar saldo: {{ a.name }}</h3>
+                    <div>
+                        <label class="label">Saldo actual</label>
+                        <div class="text-sm text-slate-500 dark:text-slate-400 mb-2">{{ a.balance | clp }}</div>
+                        <label class="label">Nuevo saldo</label>
+                        <input type="text" inputmode="numeric" name="balance" required class="input money-input" placeholder="0">
+                    </div>
+                    <div>
+                        <label class="label">Motivo (opcional)</label>
+                        <input type="text" name="note" class="input" placeholder="Ej: Conciliación con cartola">
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button type="submit" class="btn-primary flex-1 justify-center">Aplicar ajuste</button>
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('adjust-{{ a.id }}').close()">Cancelar</button>
+                    </div>
+                </form>
+            </dialog>
+        {% endfor %}
+    </div>
+    {% else %}
+        {% with icon='landmark', title='Sin cuentas aún', message='Agrega tus cuentas bancarias para llevar el control de tus saldos.', action_url='/cuentas/nueva', action_label='Crear cuenta' %}
+            {% include 'partials/empty_state.html' %}
+        {% endwith %}
+    {% endif %}
+
+</div>
+{% endblock %}

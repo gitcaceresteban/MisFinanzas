@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Pagar {{ loan.name }}{% endblock %}
+{% block page_title %}Pagar crédito{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto">
+    <div class="mb-5">
+        <a href="/creditos/{{ loan.id }}" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <span>←</span> Volver al crédito
+        </a>
+    </div>
+
+    <div class="card overflow-hidden">
+        <!-- Encabezado tipo app del banco -->
+        <div class="px-6 py-5 text-white flex items-center gap-3"
+             style="background: linear-gradient(135deg, {{ loan.bank_color or '#4f46e5' }}, {{ loan.bank_color or '#4f46e5' }}cc);">
+            {% if loan.bank_logo %}
+                <img src="/bancos/logo/{{ loan.bank_logo }}" alt="" class="w-11 h-11 rounded-xl bg-white/90 object-contain p-1">
+            {% else %}
+                <div class="w-11 h-11 rounded-xl bg-white/20 grid place-items-center text-2xl">💳</div>
+            {% endif %}
+            <div>
+                <div class="text-lg font-bold leading-tight">Pagar mi crédito</div>
+                <div class="text-sm text-white/80">{{ loan.name }} · {{ loan.bank_name or loan.entity or '' }}</div>
+            </div>
+        </div>
+
+        {% if inst %}
+        <form method="POST" action="/creditos/cuota/{{ inst.id }}/pagar"
+              data-confirm="¿Confirmas el pago de esta cuota? Se descontará de la cuenta seleccionada.">
+            <div class="p-6 space-y-1">
+                <div class="pay-row"><span>Crédito</span><span class="font-medium">{{ loan.name }}</span></div>
+                <div class="pay-row"><span>Monto que solicitaste</span><span class="num">{{ loan.original_amount | clp }}</span></div>
+                <div class="pay-row"><span>N° cuota</span><span class="num">{{ '%02d' % inst.installment_number }} / {{ '%02d' % loan.total_installments }}</span></div>
+                <div class="pay-row"><span>Fecha de vencimiento</span><span>{{ inst.due_date | fecha }}</span></div>
+                <div class="pay-row"><span>Valor cuota</span><span class="num">{{ inst.amount | clp }}</span></div>
+                <div class="pay-row"><span>Deuda restante</span><span class="num">{{ loan.pending_amount | clp }}</span></div>
+                <div class="pay-row pay-row-total">
+                    <span>Monto a pagar</span>
+                    <span class="num text-emerald-600 dark:text-emerald-400">{{ inst.amount | clp }}</span>
+                </div>
+            </div>
+
+            <div class="px-6 pb-6 space-y-4 border-t border-slate-100 dark:border-slate-800 pt-5">
+                <div>
+                    <label class="label">Elige tu forma de pago</label>
+                    {% if accounts %}
+                    <select name="account_id" class="select">
+                        <option value="">— No descontar de ninguna cuenta —</option>
+                        {% for a in accounts %}
+                            <option value="{{ a.id }}">{{ a.name }}{% if a.bank_name %} · {{ a.bank_name }}{% endif %} ({{ a.balance | clp }})</option>
+                        {% endfor %}
+                    </select>
+                    <p class="hint">Si eliges una cuenta, se descuenta el saldo y se registra el gasto automáticamente.</p>
+                    {% else %}
+                    <p class="text-sm text-slate-500 dark:text-slate-400">No tienes cuentas activas. Se marcará la cuota como pagada sin descontar saldo.</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="label">Fecha de pago</label>
+                    <input type="date" name="date" class="input" value="{{ today }}">
+                </div>
+
+                <button type="submit" class="btn-primary w-full justify-center text-base py-3">
+                    ✅ Pagar cuota {{ inst.installment_number }} · {{ inst.amount | clp }}
+                </button>
+            </div>
+        </form>
+        {% else %}
+        <div class="p-10 text-center">
+            <div class="text-5xl mb-3">🎉</div>
+            <h3 class="text-lg font-semibold">¡Sin cuotas pendientes!</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Este crédito no tiene cuotas por pagar.</p>
+            <a href="/creditos/{{ loan.id }}" class="btn-secondary mt-5 inline-flex">Volver</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

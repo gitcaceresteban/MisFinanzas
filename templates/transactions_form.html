@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% block title %}{% if tx %}Editar{% else %}Nuevo{% endif %} movimiento{% endblock %}
+{% block page_title %}{% if tx %}Editar{% else %}Nuevo{% endif %} movimiento{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+    <div class="mb-6">
+        <a href="/gastos/" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <span>←</span> Volver
+        </a>
+    </div>
+
+    {% set sel = namespace(label='', logo='', target='') %}
+    {% if tx and tx.card_id %}{% for c in cards %}{% if c.id == tx.card_id %}{% set sel.label = c.name ~ (' · ' ~ c.bank_name if c.bank_name else '') %}{% set sel.logo = c.bank_logo or '' %}{% set sel.target = 'card:' ~ c.id %}{% endif %}{% endfor %}
+    {% elif tx and tx.account_id %}{% for a in accounts %}{% if a.id == tx.account_id %}{% set sel.label = a.name ~ (' · ' ~ a.bank_name if a.bank_name else '') %}{% set sel.logo = a.bank_logo or '' %}{% set sel.target = 'acc:' ~ a.id %}{% endif %}{% endfor %}{% endif %}
+    <form method="POST" enctype="multipart/form-data" class="card-padded space-y-5"
+          x-data="{ shared: {{ 'true' if tx and tx.is_shared else 'false' }}, mode: 'people', rows: [{}],
+                    pmOpen: false, pmTarget: '{{ sel.target }}', pmLabel: '{{ sel.label }}', pmLogo: '{{ sel.logo }}',
+                    get isCard() { return this.pmTarget.startsWith('card:'); },
+                    pick(t, l, g) { this.pmTarget = t; this.pmLabel = l; this.pmLogo = g; this.pmOpen = false; } }">
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="label">Fecha</label>
+                <input type="date" name="date" required class="input"
+                       value="{{ tx.date if tx else today }}">
+            </div>
+            <div>
+                <label class="label">Monto (CLP)</label>
+                <input type="text" inputmode="numeric" name="amount" required class="input num money-input"
+                       value="{{ tx.amount if tx else '' }}" placeholder="0" oninput="updateMyShare()">
+            </div>
+            <div>
+                <label class="label">Tipo</label>
+                <select name="type" class="select">
+                    <option value="expense" {% if tx and tx.type == 'expense' %}selected{% elif not tx %}selected{% endif %}>Gasto</option>
+                    <option value="income" {% if tx and tx.type == 'income' %}selected{% endif %}>Ingreso</option>
+                    <option value="transfer" {% if tx and tx.type == 'transfer' %}selected{% endif %}>Transferencia</option>
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label class="label">Descripción</label>
+            <input type="text" name="description" class="input"
+                   value="{{ tx.description if tx else '' }}"
+                   placeholder="Ej: Almuerzo, Sueldo, Supermercado">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Categoría</label>
+                <select name="category_id" class="select">
+                    <option value="">— Sin categoría —</option>
+                    {% for c in categories %}
+                        <option value="{{ c.id }}" {% if tx and tx.category_id == c.id %}selected{% endif %}>{{ c.icon | emoji }} {{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label">Persona (opcional)</label>
+                <select name="person_id" class="select">
+                    <option value="">— Sin persona —</option>
+                    {% for p in people %}
+                        <option value="{{ p.id }}" {% if tx and tx.person_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- ====== MÉTODO DE PAGO unificado (cuentas + tarjetas con logo) ====== -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Método de pago</label>
+                <div class="relative" @click.outside="pmOpen = false">
+                    <button type="button" @click="pmOpen = !pmOpen"
+                            class="input flex items-center justify-between text-left">
+                        <span class="flex items-center gap-2 truncate">
+                            <template x-if="pmLogo"><img :src="'/bancos/logo/' + pmLogo" class="w-5 h-5 rounded object-contain bg-white shrink-0"></template>
+                            <template x-if="!pmLogo"><span class="text-base leading-none" x-text="isCard ? '💳' : (pmTarget ? '💵' : '💰')"></span></template>
+                            <span class="truncate" :class="!pmLabel && 'text-slate-400'" x-text="pmLabel || '— Elige cuenta o tarjeta —'"></span>
+                        </span>
+                        <span class="text-slate-400 shrink-0">▾</span>
+                    </button>
+                    <input type="hidden" name="payment_target" :value="pmTarget">
+                    <div x-show="pmOpen" x-cloak
+                         class="absolute z-30 mt-1 w-full max-h-72 overflow-auto rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lift p-1.5">
+                        <button type="button" @click="pick('', '', '')" class="pm-option">
+                            <span class="text-base leading-none">💰</span><span class="text-slate-500">Efectivo / sin cuenta</span>
+                        </button>
+                        {% if accounts %}<div class="pm-group">💵 Cuentas</div>{% endif %}
+                        {% for a in accounts %}
+                        <button type="button" class="pm-option"
+                                @click="pick('acc:{{ a.id }}', '{{ (a.name ~ (' · ' ~ a.bank_name if a.bank_name else '')) | e }}', '{{ a.bank_logo or '' }}')">
+                            {% if a.bank_logo %}<img src="/bancos/logo/{{ a.bank_logo }}" class="w-5 h-5 rounded object-contain bg-white">{% else %}<span class="text-base leading-none">💵</span>{% endif %}
+                            <span>{{ a.name }}{% if a.bank_name %} · {{ a.bank_name }}{% endif %}</span>
+                        </button>
+                        {% endfor %}
+                        {% if cards %}<div class="pm-group">💳 Tarjetas de crédito</div>{% endif %}
+                        {% for c in cards %}
+                        <button type="button" class="pm-option"
+                                @click="pick('card:{{ c.id }}', '{{ (c.name ~ (' · ' ~ c.bank_name if c.bank_name else '')) | e }}', '{{ c.bank_logo or '' }}')">
+                            {% if c.bank_logo %}<img src="/bancos/logo/{{ c.bank_logo }}" class="w-5 h-5 rounded object-contain bg-white">{% else %}<span class="text-base leading-none">💳</span>{% endif %}
+                            <span>{{ c.name }}{% if c.bank_name %} · {{ c.bank_name }}{% endif %}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                <p class="hint">De dónde sale el dinero. Si es tarjeta, indica las cuotas →</p>
+            </div>
+
+            <div x-show="isCard" x-cloak>
+                <label class="label">Número de cuotas</label>
+                <input type="number" min="1" max="48" name="installments_total" class="input"
+                       value="{{ tx.installments_total if tx and tx.installments_total else 1 }}">
+                <p class="hint">1 = compra normal. 2 o más genera cuotas mensuales.</p>
+            </div>
+        </div>
+
+        <!-- ============ GASTO COMPARTIDO ============ -->
+        <div class="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <label class="flex items-center gap-3 p-4 cursor-pointer bg-slate-50 dark:bg-slate-800/50">
+                <input type="checkbox" name="is_shared" x-model="shared" class="w-4 h-4 rounded">
+                <span class="text-sm font-medium">👥 Gasto compartido (alguien me debe parte)</span>
+            </label>
+
+            <div x-show="shared" x-transition x-cloak class="p-4 space-y-4 border-t border-slate-200 dark:border-slate-700">
+                <!-- Modo -->
+                <div class="flex flex-wrap gap-2">
+                    <label class="flex-1 min-w-[140px]">
+                        <input type="radio" name="shared_mode" value="people" x-model="mode" class="peer sr-only">
+                        <div class="px-3 py-2 rounded-lg border text-sm text-center cursor-pointer transition
+                                    peer-checked:border-primary-500 peer-checked:bg-primary-50 dark:peer-checked:bg-primary-500/10
+                                    border-slate-200 dark:border-slate-700">
+                            👤 Dividir con personas
+                        </div>
+                    </label>
+                    <label class="flex-1 min-w-[140px]">
+                        <input type="radio" name="shared_mode" value="household" x-model="mode" class="peer sr-only">
+                        <div class="px-3 py-2 rounded-lg border text-sm text-center cursor-pointer transition
+                                    peer-checked:border-primary-500 peer-checked:bg-primary-50 dark:peer-checked:bg-primary-500/10
+                                    border-slate-200 dark:border-slate-700">
+                            🏠 Cuenta del Hogar
+                        </div>
+                    </label>
+                </div>
+
+                <p class="hint" x-show="mode === 'people'">Indica cuánto le corresponde a cada persona. Se crearán cuentas por cobrar.</p>
+                <p class="hint" x-show="mode === 'household'">Se registrará como cuenta del hogar con los participantes indicados.</p>
+
+                <!-- Filas de participantes -->
+                <template x-for="(row, i) in rows" :key="i">
+                    <div class="split-row">
+                        <select :name="'share_person_id[]'" class="select flex-1">
+                            <option value="">— Persona —</option>
+                            {% for p in people %}
+                                <option value="{{ p.id }}">{{ p.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" inputmode="numeric" :name="'share_amount[]'"
+                               class="input money-input w-32" placeholder="Monto" oninput="updateMyShare()">
+                        <button type="button" class="icon-btn icon-btn-danger shrink-0"
+                                @click="rows.splice(i,1); $nextTick(updateMyShare)" x-show="rows.length > 1">✕</button>
+                    </div>
+                </template>
+
+                <button type="button" class="btn-secondary btn-sm" @click="rows.push({}); $nextTick(() => { if(window.lucide) lucide.createIcons(); })">
+                    ➕ Agregar persona
+                </button>
+
+                <div class="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-sm">
+                    <span class="font-medium">Mi parte (lo que me toca a mí)</span>
+                    <span class="font-bold num text-emerald-700 dark:text-emerald-400" id="my_share_display">$0</span>
+                </div>
+            </div>
+        </div>
+        <!-- ========================================== -->
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Estado</label>
+                <select name="status" class="select">
+                    {% for v, l in statuses %}
+                        <option value="{{ v }}" {% if tx and tx.status == v %}selected{% elif not tx and v == 'pagado' %}selected{% endif %}>{{ l }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label">Proyecto / Tags</label>
+                <input type="text" name="project" class="input"
+                       value="{{ tx.project if tx else '' }}" placeholder="Opcional">
+            </div>
+        </div>
+
+        <div>
+            <label class="label">Adjuntar boleta/comprobante (opcional)</label>
+            <input type="file" name="attachment" class="input" accept="image/*,.pdf">
+        </div>
+
+        <div>
+            <label class="label">Notas</label>
+            <textarea name="notes" class="textarea" rows="2">{{ tx.notes if tx else '' }}</textarea>
+        </div>
+
+        <div class="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button type="submit" class="btn-primary">
+                ✅ <span>{{ 'Guardar' if tx else 'Crear movimiento' }}</span>
+            </button>
+            <a href="/gastos/" class="btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script>
+// Calcula "mi parte" = monto total − suma de lo asignado a otras personas.
+function updateMyShare() {
+    const form = document.querySelector('form');
+    if (!form) return;
+    const totalEl = form.querySelector('input[name="amount"]');
+    const total = window.parseMoney ? parseMoney(totalEl ? totalEl.value : '0') : 0;
+    let sum = 0;
+    form.querySelectorAll('input[name="share_amount[]"]').forEach(el => {
+        sum += window.parseMoney ? parseMoney(el.value) : 0;
+    });
+    const mine = Math.max(0, total - sum);
+    const disp = document.getElementById('my_share_display');
+    if (disp) disp.textContent = '$' + mine.toLocaleString('es-CL').replace(/,/g, '.');
+}
+document.addEventListener('money:changed', updateMyShare);
+document.addEventListener('DOMContentLoaded', updateMyShare);
+</script>
+{% endblock %}

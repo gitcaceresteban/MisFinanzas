@@ -1,0 +1,415 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard · {{ app_name }}{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Saludo -->
+    <div class="flex items-center justify-between gap-3">
+        <div>
+            <h2 class="text-2xl lg:text-3xl font-bold">Hola, {{ user_name or 'Esteban' }} 👋</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Resumen de {{ month | month_es }} {{ year }}
+            </p>
+        </div>
+        <a href="/alertas/generar" onclick="event.preventDefault(); document.getElementById('gen-alerts-form').submit();" class="btn-secondary btn-sm shrink-0">
+            <span class="leading-none">🔄</span>
+            <span class="hidden lg:inline">Actualizar alertas</span>
+        </a>
+        <form id="gen-alerts-form" action="/alertas/generar" method="POST" class="hidden"></form>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <a href="/cuentas/" class="stat-card card-hover">
+            <div class="flex items-start justify-between mb-2">
+                <div class="stat-label">Saldo total</div>
+                <div class="stat-icon bg-emerald-100 dark:bg-emerald-500/15">💰</div>
+            </div>
+            <div class="stat-value">{{ total_balance | clp }}</div>
+            <div class="stat-sub">{{ accounts | length }} cuenta(s)</div>
+        </a>
+
+        <a href="/tarjetas/" class="stat-card card-hover">
+            <div class="flex items-start justify-between mb-2">
+                <div class="stat-label">Cupo disponible</div>
+                <div class="stat-icon bg-blue-100 dark:bg-blue-500/15">💳</div>
+            </div>
+            <div class="stat-value">{{ total_cards_available | clp }}</div>
+            <div class="stat-sub">de {{ total_cards_limit | clp }}</div>
+        </a>
+
+        <a href="/gastos/" class="stat-card card-hover">
+            <div class="flex items-start justify-between mb-2">
+                <div class="stat-label">Gastos del mes</div>
+                <div class="stat-icon bg-rose-100 dark:bg-rose-500/15">💸</div>
+            </div>
+            <div class="stat-value text-rose-600 dark:text-rose-400">{{ month_total_expense | clp }}</div>
+            <div class="stat-sub">{{ month_count_tx }} movimientos</div>
+        </a>
+
+        <a href="/ingresos/" class="stat-card card-hover">
+            <div class="flex items-start justify-between mb-2">
+                <div class="stat-label">Ingresos del mes</div>
+                <div class="stat-icon bg-emerald-100 dark:bg-emerald-500/15">📈</div>
+            </div>
+            <div class="stat-value text-emerald-600 dark:text-emerald-400">{{ month_total_income | clp }}</div>
+            <div class="text-xs font-semibold mt-1 {% if month_balance >= 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">
+                Saldo: {{ month_balance | clp }}
+            </div>
+        </a>
+    </div>
+
+    <!-- Plan del mes: cuánto puedo gastar -->
+    <div class="card-padded bg-gradient-to-br from-primary-500 to-primary-700 text-white border-0 shadow-lift">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <div>
+                <div class="text-sm font-medium opacity-80 mb-1">🧮 Disponible para gastar este mes</div>
+                <div class="text-3xl lg:text-4xl font-bold num">{{ spend_remaining | clp }}</div>
+                {% if monthly_income > 0 %}
+                <div class="text-xs opacity-80 mt-2">
+                    Ingreso {{ monthly_income | clp }} − compromisos {{ (monthly_income - spend_ceiling) | clp }} = techo {{ spend_ceiling | clp }} · ya gastaste {{ variable_spent | clp }}
+                </div>
+                {% else %}
+                <div class="text-xs opacity-80 mt-2">Ingresa tu sueldo estimado para calcular tu disponible →</div>
+                {% endif %}
+            </div>
+            <div class="flex flex-col items-end gap-2">
+                <span class="text-5xl opacity-30">💸</span>
+                <a href="/plan/" class="text-xs font-semibold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition">Ver plan & simular →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen deudas: me deben / debo -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <a href="/personas/" class="stat-card card-hover">
+            <div class="flex items-start justify-between mb-2">
+                <div class="stat-label">Me deben</div>
+                <div class="stat-icon bg-emerald-100 dark:bg-emerald-500/15">🤝</div>
+            </div>
+            <div class="stat-value text-emerald-600 dark:text-emerald-400">{{ they_owe_me_total | clp }}</div>
+            <div class="stat-sub">{% if household_receivable > 0 %}incluye {{ household_receivable | clp }} del hogar{% else %}por cobrar{% endif %}</div>
+        </a>
+        <a href="/personas/" class="stat-card card-hover">
+            <div class="flex items-start justify-between mb-2">
+                <div class="stat-label">Yo debo</div>
+                <div class="stat-icon bg-rose-100 dark:bg-rose-500/15">📌</div>
+            </div>
+            <div class="stat-value text-rose-600 dark:text-rose-400">{{ i_owe_them | clp }}</div>
+            <div class="stat-sub">a personas</div>
+        </a>
+        <a href="/creditos/" class="stat-card card-hover">
+            <div class="flex items-start justify-between mb-2">
+                <div class="stat-label">Créditos vigentes</div>
+                <div class="stat-icon bg-violet-100 dark:bg-violet-500/15">📉</div>
+            </div>
+            <div class="stat-value">{{ loans_summary.pending | clp }}</div>
+            <div class="stat-sub">cuota mensual {{ loans_summary.monthly | clp }}</div>
+        </a>
+    </div>
+
+    <!-- Cuotas futuras -->
+    {% if total_future_installments > 0 %}
+    <div class="card-padded bg-gradient-to-br from-violet-500 to-purple-700 dark:from-violet-600 dark:to-purple-800 text-white border-0 shadow-lift">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="text-sm font-medium opacity-80 mb-1">🧾 Cuotas futuras de tarjetas</div>
+                <div class="text-3xl font-bold num">{{ total_future_installments | clp }}</div>
+                <div class="text-xs opacity-75 mt-2">A pagar en próximos meses</div>
+            </div>
+            <span class="text-5xl opacity-40">📑</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Charts row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Gastos por categoría -->
+        <div class="card-padded">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="section-title">📊 Gastos por categoría</h3>
+                <a href="/gastos/" class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Ver todos</a>
+            </div>
+            {% if expenses_by_category %}
+                <div class="h-64">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            {% else %}
+                <div class="py-12 text-center text-sm text-slate-400">
+                    <div class="text-4xl mb-2 opacity-60">🍩</div>
+                    Sin gastos este mes
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Evolución mensual -->
+        <div class="card-padded">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="section-title">📈 Evolución últimos 6 meses</h3>
+            </div>
+            {% if monthly_evolution %}
+                <div class="h-64">
+                    <canvas id="evolutionChart"></canvas>
+                </div>
+            {% else %}
+                <div class="py-12 text-center text-sm text-slate-400">
+                    <div class="text-4xl mb-2 opacity-60">📉</div>
+                    Sin datos suficientes
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tres columnas: cuentas, tarjetas, próximos -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Cuentas -->
+        <div class="card-padded">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="section-title">💵 Mis cuentas</h3>
+                <a href="/cuentas/" class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Ver todas</a>
+            </div>
+            <div class="space-y-3">
+                {% for a in accounts[:5] %}
+                    <div class="flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 bank-stripe"
+                         style="--bank-color: {{ a.bank_color or '#64748b' }};">
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium truncate">{{ a.name }}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">{{ a.bank_name or 'Sin banco' }}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-semibold num">{{ a.balance | clp }}</div>
+                            <div class="text-xs text-slate-400 capitalize">{{ a.type }}</div>
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="text-sm text-slate-400 text-center py-6">No tienes cuentas aún.
+                        <a href="/cuentas/nueva" class="text-primary-600 dark:text-primary-400 hover:underline">Crear una</a>
+                    </p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Tarjetas -->
+        <div class="card-padded">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="section-title">💳 Mis tarjetas</h3>
+                <a href="/tarjetas/" class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Ver todas</a>
+            </div>
+            <div class="space-y-3">
+                {% for c in cards[:5] %}
+                    {% set pct = ((c.used_amount or 0) / c.credit_limit * 100) if c.credit_limit else 0 %}
+                    <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="min-w-0">
+                                <div class="text-sm font-medium truncate" style="color: {{ c.bank_color or '#64748b' }};">{{ c.name }}</div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400">{{ c.bank_name or '—' }}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-xs font-medium num">{{ c.available_limit | clp }}</div>
+                                <div class="text-xs text-slate-400">disponible</div>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill"
+                                 style="width: {{ pct }}%; background-color: {{ c.bank_color or '#3b82f6' }};"></div>
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="text-sm text-slate-400 text-center py-6">No tienes tarjetas aún.
+                        <a href="/tarjetas/nueva" class="text-primary-600 dark:text-primary-400 hover:underline">Crear una</a>
+                    </p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Próximos -->
+        <div class="card-padded">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="section-title">📅 Próximos pagos</h3>
+                <a href="/calendario/" class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Calendario</a>
+            </div>
+            <div class="space-y-2">
+                {% for u in upcoming[:8] %}
+                    <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="emoji-chip emoji-chip-sm" style="background-color: {{ u.color }}20;">
+                            {% if u.kind == 'card' %}💳{% elif u.kind == 'loan' %}📉{% else %}🔁{% endif %}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium truncate">{{ u.title }}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">
+                                {% if u.day %}Día {{ u.day }}{% elif u.date %}{{ u.date | fecha }}{% endif %}
+                            </div>
+                        </div>
+                        <div class="text-sm font-semibold num">{{ u.amount | clp }}</div>
+                    </div>
+                {% else %}
+                    <p class="text-sm text-slate-400 text-center py-6">Nada pendiente esta semana 🎉</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Personas y créditos -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <div class="card-padded">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="section-title">🤝 Deudas con personas</h3>
+                <a href="/personas/" class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Ver</a>
+            </div>
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                        <span class="text-sm">Me deben</span>
+                    </div>
+                    <span class="text-sm font-bold num text-emerald-600 dark:text-emerald-400">{{ they_owe_me | clp }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-rose-500"></div>
+                        <span class="text-sm">Debo</span>
+                    </div>
+                    <span class="text-sm font-bold num text-rose-600 dark:text-rose-400">{{ i_owe_them | clp }}</span>
+                </div>
+                <div class="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span class="text-sm font-medium">Neto</span>
+                    <span class="text-sm font-bold num">{{ (they_owe_me - i_owe_them) | clp }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-padded">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="section-title">📉 Créditos</h3>
+                <a href="/creditos/" class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Ver</a>
+            </div>
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm">Deuda total</span>
+                    <span class="text-sm font-bold num">{{ loans_summary.pending | clp }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm">Cuota mensual</span>
+                    <span class="text-sm font-bold num">{{ loans_summary.monthly | clp }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm">Créditos activos</span>
+                    <span class="text-sm font-medium">{{ loans_summary.count }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-padded">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="section-title">🏠 Cuentas del hogar</h3>
+                <a href="/hogar/" class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Ver</a>
+            </div>
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm">Pendientes</span>
+                    <span class="text-sm font-medium">{{ household_pending.count }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm">Monto total</span>
+                    <span class="text-sm font-bold num">{{ household_pending.total | clp }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Presupuestos -->
+    {% if budgets %}
+    <div class="card-padded">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="section-title">🎯 Presupuestos del mes</h3>
+            <a href="/presupuestos/" class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Ver todos</a>
+        </div>
+        <div class="space-y-3">
+            {% for b in budgets %}
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base leading-none">{{ b.category_icon | emoji }}</span>
+                            <span class="text-sm font-medium">{{ b.category_name }}</span>
+                        </div>
+                        <span class="text-xs num {% if b.over %}text-rose-600 dark:text-rose-400 font-semibold{% endif %}">
+                            {{ b.spent | clp }} / {{ b.amount | clp }}
+                            <span class="ml-1 opacity-60">({{ b.pct }}%)</span>
+                        </span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill"
+                             style="width: {{ b.pct if b.pct <= 100 else 100 }}%; background-color: {% if b.over %}#f43f5e{% elif b.pct >= 80 %}#f59e0b{% else %}{{ b.category_color or '#10b981' }}{% endif %};"></div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Últimas transacciones -->
+    <div class="card-padded">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="section-title">🧾 Últimas transacciones</h3>
+            <a href="/gastos/" class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Ver todas</a>
+        </div>
+        <div class="overflow-x-auto -mx-5 lg:-mx-6">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Descripción</th>
+                        <th>Categoría</th>
+                        <th>Origen</th>
+                        <th class="text-right">Monto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in last_transactions %}
+                        <tr>
+                            <td class="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ t.date | fecha }}</td>
+                            <td class="font-medium">{{ t.description or '—' }}</td>
+                            <td>
+                                {% if t.category_name %}
+                                    <span class="badge" style="background-color: {{ t.category_color }}20; color: {{ t.category_color }};">
+                                        {{ t.category_name }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-xs text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-xs text-slate-500 dark:text-slate-400">{{ t.account_name or t.card_name or '—' }}</td>
+                            <td class="text-right font-semibold num {% if t.type == 'income' %}text-emerald-600 dark:text-emerald-400{% else %}text-slate-900 dark:text-white{% endif %} whitespace-nowrap">
+                                {% if t.type == 'income' %}+{% else %}-{% endif %}{{ t.amount | clp }}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-center py-8 text-slate-400 text-sm">Sin transacciones aún. <a href="/gastos/nuevo" class="text-primary-600 hover:underline">Crear la primera</a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        {% if expenses_by_category %}
+        window.makeCategoryChart('categoryChart', {{ expenses_by_category | tojson }});
+        {% endif %}
+        {% if monthly_evolution %}
+        window.makeEvolutionChart('evolutionChart', {{ monthly_evolution | tojson }});
+        {% endif %}
+    });
+</script>
+{% endblock %}

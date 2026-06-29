@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}Ingresos{% endblock %}
+{% block page_title %}Ingresos{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold">Ingresos</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                {{ month | month_es }} {{ year }} · <span class="font-bold text-emerald-600 dark:text-emerald-400">{{ total | clp }}</span>
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <form method="GET" class="flex gap-2">
+                <select name="year" class="select text-sm">
+                    {% for y in range(year-2, year+1) %}
+                        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+                <select name="month" class="select text-sm">
+                    {% for m in range(1, 13) %}
+                        <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m | month_es }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-secondary text-sm"><i data-lucide="filter" class="w-4 h-4"></i></button>
+            </form>
+            <a href="/gastos/nuevo?type=income" class="btn-primary">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Nuevo ingreso</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Gráfico mensual -->
+    {% if monthly %}
+    <div class="card-padded">
+        <h3 class="text-base font-semibold mb-4">Evolución últimos 12 meses</h3>
+        <div class="h-56">
+            <canvas id="incomeMonthly"></canvas>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Por categoría -->
+    {% if by_category %}
+    <div class="card-padded">
+        <h3 class="text-base font-semibold mb-4">Por categoría ({{ month | month_es }})</h3>
+        <div class="space-y-2">
+            {% for c in by_category %}
+                <div class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background-color: {{ c.color }}20;">
+                            <i data-lucide="{{ c.icon or 'tag' }}" class="w-4 h-4" style="color: {{ c.color }};"></i>
+                        </div>
+                        <span class="font-medium">{{ c.name or 'Sin categoría' }}</span>
+                    </div>
+                    <span class="font-semibold num text-emerald-600 dark:text-emerald-400">{{ c.total | clp }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Listado -->
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Descripción</th>
+                        <th>Categoría</th>
+                        <th>Cuenta</th>
+                        <th>Persona</th>
+                        <th class="text-right">Monto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in incomes %}
+                        <tr>
+                            <td class="text-xs text-slate-500 whitespace-nowrap">{{ i.date | fecha }}</td>
+                            <td class="font-medium">{{ i.description or '—' }}</td>
+                            <td>
+                                {% if i.category_name %}
+                                    <span class="badge" style="background-color: {{ i.category_color }}20; color: {{ i.category_color }};">{{ i.category_name }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-xs text-slate-500">{{ i.account_name or '—' }}</td>
+                            <td class="text-xs">{{ i.person_name or '—' }}</td>
+                            <td class="text-right font-semibold num text-emerald-600 dark:text-emerald-400">
+                                +{{ i.amount | clp }}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6" class="text-center py-8 text-slate-400 text-sm">Sin ingresos este mes</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if monthly %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const ctx = document.getElementById('incomeMonthly');
+        if (!ctx) return;
+        const data = {{ monthly | tojson }};
+        const isDark = document.documentElement.classList.contains('dark');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.map(d => d.month),
+                datasets: [{
+                    label: 'Ingresos',
+                    data: data.map(d => d.total),
+                    backgroundColor: '#10b981',
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: isDark ? '#cbd5e1' : '#475569' }, grid: { display: false } },
+                    y: {
+                        ticks: { color: isDark ? '#cbd5e1' : '#475569', callback: (v) => window.fmtCLP(v) },
+                        grid: { color: isDark ? 'rgba(148,163,184,0.1)' : 'rgba(148,163,184,0.2)' }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

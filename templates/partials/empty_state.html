@@ -1,0 +1,11 @@
+<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
+    <div class="empty-emoji">{{ icon | emoji('📭') }}</div>
+    <h3 class="text-lg font-semibold mb-2">{{ title }}</h3>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-md">{{ message }}</p>
+    {% if action_url %}
+        <a href="{{ action_url }}" class="btn-primary">
+            <span class="leading-none">➕</span>
+            <span>{{ action_label | default('Crear') }}</span>
+        </a>
+    {% endif %}
+</div>

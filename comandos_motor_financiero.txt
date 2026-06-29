@@ -1,0 +1,154 @@
+========================================
+MOTOR FINANCIERO PERSONAL - COMANDOS
+========================================
+
+Ruta de la app:
+cd /home/caceresteban/Aplicaciones/motor-financiero
+
+URL local:
+http://192.168.1.100:5000
+
+URL alternativa:
+http://raspberrypi.local:5000
+
+
+========================================
+SERVICIO SYSTEMD
+========================================
+
+Ver estado:
+sudo systemctl status finance-app
+
+Iniciar app:
+sudo systemctl start finance-app
+
+Detener app:
+sudo systemctl stop finance-app
+
+Reiniciar app:
+sudo systemctl restart finance-app
+
+Activar inicio automático:
+sudo systemctl enable finance-app
+
+Desactivar inicio automático:
+sudo systemctl disable finance-app
+
+Ver logs en vivo:
+journalctl -u finance-app -f
+
+Ver últimos logs:
+journalctl -u finance-app -n 50 --no-pager
+
+
+========================================
+PUERTO 5000
+========================================
+
+Ver quién usa el puerto 5000:
+sudo lsof -i :5000
+
+Alternativa:
+sudo ss -ltnp | grep :5000
+
+Liberar puerto 5000:
+sudo fuser -k 5000/tcp
+
+
+========================================
+EJECUCIÓN MANUAL
+========================================
+
+Entrar a la carpeta:
+cd /home/caceresteban/Aplicaciones/motor-financiero
+
+Ejecutar manualmente:
+python app.py
+
+Detener ejecución manual:
+CTRL + C
+
+
+========================================
+ARCHIVO DEL SERVICIO
+========================================
+
+Editar servicio:
+sudo nano /etc/systemd/system/finance-app.service
+
+Contenido actual esperado:
+
+[Unit]
+Description=Motor Financiero Personal
+After=network.target
+
+[Service]
+User=caceresteban
+WorkingDirectory=/home/caceresteban/Aplicaciones/motor-financiero
+ExecStart=/usr/bin/python /home/caceresteban/Aplicaciones/motor-financiero/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+Después de editar el servicio:
+sudo systemctl daemon-reload
+sudo systemctl restart finance-app
+sudo systemctl status finance-app
+
+
+========================================
+RESPALDO DE BASE DE DATOS
+========================================
+
+Crear backup manual:
+mkdir -p backups
+cp database/finance.db backups/finance_$(date +%Y%m%d_%H%M).db
+
+Ver backups:
+ls -lh backups
+
+
+========================================
+ACTUALIZAR APP DESDE ZIP
+========================================
+
+Desde Mac, copiar ZIP a la Raspberry:
+scp motor-financiero.zip caceresteban@raspberrypi.local:/home/caceresteban/Aplicaciones/
+
+En Raspberry:
+cd /home/caceresteban/Aplicaciones
+
+Detener servicio:
+sudo systemctl stop finance-app
+
+Respaldar versión actual:
+mv motor-financiero motor-financiero_backup_$(date +%Y%m%d_%H%M)
+
+Descomprimir nueva versión:
+unzip motor-financiero.zip -d motor-financiero
+
+Entrar:
+cd motor-financiero
+
+Probar manual:
+python app.py
+
+Reiniciar servicio:
+sudo systemctl restart finance-app
+sudo systemctl status finance-app
+
+
+========================================
+REINICIO DE RASPBERRY
+========================================
+
+Reiniciar Raspberry:
+sudo reboot
+
+Apagar Raspberry:
+sudo shutdown now
+
+Ver IP de la Raspberry:
+hostname -I

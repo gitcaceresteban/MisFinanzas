@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block title %}Plan & escenarios{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <h2 class="text-2xl font-bold">🧮 Plan & escenarios</h2>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Cuánto puedes gastar este mes y cómo se ven los próximos, considerando cuotas, créditos y recurrentes.
+        </p>
+    </div>
+
+    <!-- Ingreso estimado + plan del mes -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- Ingreso estimado -->
+        <div class="card-padded">
+            <div class="section-title mb-3">💵 Ingreso estimado mensual</div>
+            <form method="POST" action="/plan/ingreso" class="space-y-3">
+                <div class="money-wrap">
+                    <input type="text" inputmode="numeric" name="monthly_income"
+                           class="input money-input text-lg font-bold" value="{{ income }}" placeholder="0">
+                </div>
+                <p class="hint">Tu sueldo + ingresos fijos esperados (ej. 2.100.000).</p>
+                <button type="submit" class="btn-primary w-full justify-center">Guardar ingreso</button>
+            </form>
+        </div>
+
+        <!-- Plan del mes -->
+        <div class="card-padded lg:col-span-2">
+            <div class="section-title mb-4">📅 Este mes — ¿cuánto puedo gastar?</div>
+            <div class="space-y-2">
+                <div class="pay-row"><span>Ingreso estimado</span><span class="num text-emerald-600 dark:text-emerald-400">{{ income | clp }}</span></div>
+                {% if this_month %}
+                <div class="pay-row"><span>− Pagos recurrentes</span><span class="num">{{ this_month.recurring | clp }}</span></div>
+                <div class="pay-row"><span>− Cuotas de créditos</span><span class="num">{{ this_month.loans | clp }}</span></div>
+                <div class="pay-row"><span>− Cuotas de tarjetas</span><span class="num">{{ this_month.cards | clp }}</span></div>
+                <div class="pay-row"><span>− Tarjetas facturadas</span><span class="num">{{ this_month.billed | clp }}</span></div>
+                <div class="pay-row"><span>− Cuentas del hogar</span><span class="num">{{ this_month.household | clp }}</span></div>
+                {% endif %}
+                <div class="pay-row pay-row-total">
+                    <span>Techo para gasto variable</span>
+                    <span class="num {% if ceiling >= 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{{ ceiling | clp }}</span>
+                </div>
+                <div class="pay-row"><span>Ya gastado este mes</span><span class="num">{{ spent | clp }}</span></div>
+                <div class="flex items-center justify-between pt-2">
+                    <span class="font-bold">Te queda para gastar</span>
+                    <span class="text-xl font-bold num {% if remaining >= 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{{ remaining | clp }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simulador de escenarios -->
+    <div class="card-padded" x-data="simulator()">
+        <div class="section-title mb-1">🧪 Simulador: ¿qué pasa si compro en cuotas?</div>
+        <p class="hint mb-4">Prueba una compra antes de hacerla y mira cómo afecta tu disponible de los próximos meses.</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div>
+                <label class="label">Monto de la compra</label>
+                <input type="text" inputmode="numeric" class="input money-input" x-ref="amount"
+                       placeholder="Ej: 600.000" @input="recalc()">
+            </div>
+            <div>
+                <label class="label">Número de cuotas</label>
+                <input type="number" min="1" max="48" class="input" x-model.number="cuotas" @input="recalc()">
+            </div>
+            <div>
+                <label class="label">Empezar en</label>
+                <select class="select" x-model.number="start" @change="recalc()">
+                    <template x-for="(m, i) in months" :key="i">
+                        <option :value="i" x-text="m.label"></option>
+                    </template>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4" x-show="cuotaValue > 0" x-cloak>
+            <div class="stat-card">
+                <div class="stat-label">Cuota mensual</div>
+                <div class="stat-value num" x-text="fmt(cuotaValue)"></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Mes más ajustado</div>
+                <div class="stat-value num" :class="minFree < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'" x-text="fmt(minFree)"></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Veredicto</div>
+                <div class="stat-value text-lg" x-text="minFree < 0 ? '⚠️ Te aprieta' : '✅ Alcanza'"></div>
+            </div>
+        </div>
+
+        <div class="rounded-xl bg-primary-50 dark:bg-primary-500/10 p-3 mb-4 text-sm" x-show="cuotas > 0" x-cloak>
+            💡 Para no quedar en rojo, tu cuota no debería superar
+            <span class="font-bold num" x-text="fmt(maxAffordable)"></span> al mes.
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Mes</th>
+                        <th class="text-right">Ingreso</th>
+                        <th class="text-right">Comprometido</th>
+                        <th class="text-right">+ Nueva cuota</th>
+                        <th class="text-right">Disponible</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(m, i) in projection" :key="i">
+                        <tr>
+                            <td class="font-medium" x-text="m.label"></td>
+                            <td class="text-right num" x-text="fmt(m.income)"></td>
+                            <td class="text-right num text-slate-500" x-text="fmt(m.committed)"></td>
+                            <td class="text-right num" :class="m.added > 0 ? 'text-violet-600 dark:text-violet-400 font-semibold' : 'text-slate-300 dark:text-slate-600'" x-text="m.added > 0 ? '+' + fmt(m.added) : '—'"></td>
+                            <td class="text-right num font-bold" :class="m.free < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'" x-text="fmt(m.free)"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function simulator() {
+    return {
+        base: {{ sim_json | safe }},
+        cuotas: 12,
+        start: 0,
+        amount: 0,
+        cuotaValue: 0,
+        projection: [],
+        minFree: 0,
+        maxAffordable: 0,
+        get months() { return this.base; },
+        init() { this.recalc(); },
+        fmt(n) {
+            n = Math.round(n || 0);
+            const s = n < 0 ? '-' : '';
+            return s + '$' + Math.abs(n).toLocaleString('es-CL').replace(/,/g, '.');
+        },
+        recalc() {
+            this.amount = window.parseMoney ? parseMoney(this.$refs.amount ? this.$refs.amount.value : '0') : 0;
+            const n = Math.max(1, parseInt(this.cuotas) || 1);
+            this.cuotaValue = this.amount > 0 ? Math.round(this.amount / n) : 0;
+            const s = parseInt(this.start) || 0;
+            let minFree = Infinity, minBaseFree = Infinity;
+            this.projection = this.base.map((m, i) => {
+                const inWindow = i >= s && i < s + n;
+                const added = inWindow ? this.cuotaValue : 0;
+                const free = m.income - m.committed - added;
+                if (free < minFree) minFree = free;
+                if (inWindow && (m.income - m.committed) < minBaseFree) minBaseFree = (m.income - m.committed);
+                return { label: m.label, income: m.income, committed: m.committed, added, free };
+            });
+            this.minFree = this.cuotaValue > 0 ? minFree : Infinity;
+            // cuota máxima que mantiene todos los meses de la ventana >= 0
+            this.maxAffordable = Math.max(0, minBaseFree === Infinity ? 0 : minBaseFree);
+        }
+    }
+}
+</script>
+{% endblock %}

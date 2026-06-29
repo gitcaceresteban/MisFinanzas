@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}Calendario · {{ month_name }} {{ year }}{% endblock %}
+{% block page_title %}Calendario financiero{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold capitalize">{{ month_name }} {{ year }}</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                {{ total_events }} eventos · <span class="font-bold num">{{ total_amount | clp }}</span>
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/calendario/?year={{ prev_year }}&month={{ prev_month }}" class="btn-secondary p-2">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+            </a>
+            <a href="/calendario/" class="btn-secondary text-sm">Hoy</a>
+            <a href="/calendario/?year={{ next_year }}&month={{ next_month }}" class="btn-secondary p-2">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Leyenda -->
+    <div class="flex flex-wrap gap-3 text-xs">
+        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-rose-500"></div><span>Tarjetas</span></div>
+        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-cyan-500"></div><span>Cuotas</span></div>
+        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-violet-500"></div><span>Créditos</span></div>
+        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-orange-500"></div><span>Recurrentes</span></div>
+        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-lime-500"></div><span>Hogar</span></div>
+        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-pink-500"></div><span>Personas</span></div>
+    </div>
+
+    <!-- Grilla calendario -->
+    <div class="card overflow-hidden">
+        <!-- Headers días -->
+        <div class="grid grid-cols-7 bg-slate-50 dark:bg-slate-800/50 text-xs font-semibold uppercase tracking-wider">
+            {% for d in ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] %}
+                <div class="px-3 py-2 text-center border-r border-slate-200 dark:border-slate-800 last:border-r-0">
+                    {{ d }}
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Semanas -->
+        {% for week in month_matrix %}
+            <div class="grid grid-cols-7">
+                {% for day in week %}
+                    {% if day == 0 %}
+                        <div class="cal-day cal-day-other"></div>
+                    {% else %}
+                        <div class="cal-day {% if year == today.year and month == today.month and day == today.day %}cal-day-today{% endif %}">
+                            <div class="text-xs font-semibold mb-1">{{ day }}</div>
+                            <div class="space-y-1">
+                                {% for e in events_by_day[day][:3] %}
+                                    <a href="{{ e.url }}" class="block px-1.5 py-0.5 rounded text-xs truncate"
+                                       style="background-color: {{ e.color }}25; color: {{ e.color }};"
+                                       title="{{ e.title }}: {{ e.amount | clp }}">
+                                        {{ e.title }}
+                                    </a>
+                                {% endfor %}
+                                {% if events_by_day[day] | length > 3 %}
+                                    <div class="text-xs text-slate-400">+{{ events_by_day[day] | length - 3 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Detalle día seleccionado (opcional, futuro) -->
+    {% if total_events == 0 %}
+        <div class="card-padded text-center text-sm text-slate-400 py-8">
+            <i data-lucide="calendar-x" class="w-10 h-10 mx-auto mb-2 opacity-50"></i>
+            Sin eventos programados este mes
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

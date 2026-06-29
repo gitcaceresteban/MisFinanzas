@@ -1,0 +1,35 @@
+# ---- Datos privados (NO subir a GitHub) ----
+# Base de datos con tus montos reales
+database/*.db
+database/*.db-wal
+database/*.db-shm
+*.db
+
+# Semilla con tus datos personales / montos reales (privado)
+database/seed_personal.py
+
+# Archivos subidos (logos, comprobantes)
+uploads/*
+!uploads/.gitkeep
+
+# Backups
+backups/*
+!backups/.gitkeep
+
+# Variables de entorno (secretos)
+.env
+
+# ---- Entornos y dependencias ----
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+node_modules/
+
+# ---- Sistema / editor ----
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/

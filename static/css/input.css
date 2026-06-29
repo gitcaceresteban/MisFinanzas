@@ -1,0 +1,294 @@
+/* ============================================================
+   Motor Financiero — sistema de diseño (fuente Tailwind)
+   Se compila a static/css/app.css con:  npm run build:css
+   ============================================================ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ----------------------------------------------------------------
+   BASE
+   ---------------------------------------------------------------- */
+@layer base {
+  [x-cloak] { display: none !important; }
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3, h4 {
+    @apply tracking-tight text-slate-900 dark:text-white;
+  }
+  /* Scrollbar discreta y consistente en toda la app */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(148 163 184 / 0.35) transparent;
+  }
+  *::-webkit-scrollbar { width: 9px; height: 9px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: rgb(148 163 184 / 0.35);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184 / 0.55); background-clip: content-box; }
+  /* Inputs de fecha: que el icono se vea bien en dark */
+  .dark input[type="date"]::-webkit-calendar-picker-indicator,
+  .dark input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+  }
+  /* Respeta usuarios con preferencia de menos movimiento */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+/* ----------------------------------------------------------------
+   COMPONENTES
+   ---------------------------------------------------------------- */
+@layer components {
+
+  /* ---------- Layout / navegación ---------- */
+  .nav-link {
+    @apply relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+           text-slate-600 dark:text-slate-400
+           hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800/70 dark:hover:text-white
+           transition-colors duration-150;
+  }
+  .nav-link .nav-emoji {
+    @apply grid place-items-center w-7 h-7 rounded-lg text-base bg-slate-100 dark:bg-slate-800
+           transition-colors duration-150 shrink-0;
+  }
+  .nav-link:hover .nav-emoji { @apply bg-white dark:bg-slate-700; }
+  .nav-link-active {
+    @apply bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300 font-semibold;
+  }
+  .nav-link-active .nav-emoji { @apply bg-primary-100 dark:bg-primary-500/20; }
+  .nav-link-active::before {
+    content: '';
+    @apply absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-primary-600 dark:bg-primary-400;
+  }
+  .nav-section {
+    @apply pt-5 pb-1 px-3 text-[0.68rem] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500;
+  }
+
+  .theme-option {
+    @apply w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg
+           text-slate-700 dark:text-slate-200
+           hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors;
+  }
+  .theme-option-active { @apply bg-primary-50 dark:bg-primary-500/15 text-primary-700 dark:text-primary-300; }
+
+  /* ---------- Botones ---------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl
+           transition-all duration-150 disabled:opacity-50 disabled:pointer-events-none
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+           dark:focus-visible:ring-offset-slate-950 select-none;
+  }
+  .btn-primary {
+    @apply btn text-white shadow-sm
+           bg-gradient-to-br from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700
+           active:scale-[0.98] shadow-primary-500/20;
+  }
+  .btn-secondary {
+    @apply btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-100
+           border border-slate-200 dark:border-slate-700
+           hover:bg-slate-50 hover:border-slate-300 dark:hover:bg-slate-700 active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply btn px-3 text-slate-600 dark:text-slate-300
+           hover:bg-slate-100 dark:hover:bg-slate-800;
+  }
+  .btn-danger {
+    @apply btn bg-rose-600 hover:bg-rose-700 text-white shadow-sm active:scale-[0.98];
+  }
+  .btn-sm { @apply px-3 py-1.5 text-xs rounded-lg gap-1.5; }
+  .btn-lg { @apply px-5 py-3 text-base; }
+
+  /* Botón-icono cuadrado (acciones de tabla, topbar) */
+  .icon-btn {
+    @apply grid place-items-center w-9 h-9 rounded-lg text-slate-500 dark:text-slate-400
+           hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white
+           transition-colors;
+  }
+  .icon-btn-danger { @apply hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400; }
+
+  /* ---------- Tarjetas ---------- */
+  .card {
+    @apply bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-soft;
+  }
+  .card-padded { @apply card p-5 lg:p-6; }
+  .card-hover { @apply transition-all duration-200 hover:shadow-card hover:-translate-y-0.5; }
+
+  /* ---------- Stat cards ---------- */
+  .stat-card { @apply card-padded flex flex-col gap-1 relative overflow-hidden; }
+  .stat-label { @apply text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400; }
+  .stat-value { @apply text-2xl lg:text-[1.75rem] font-bold text-slate-900 dark:text-white num leading-tight; }
+  .stat-sub { @apply text-xs text-slate-500 dark:text-slate-400 mt-0.5; }
+  .stat-icon {
+    @apply grid place-items-center w-11 h-11 rounded-xl text-xl shrink-0;
+  }
+  .stat-change { @apply inline-flex items-center gap-1 text-xs font-semibold mt-1; }
+  .stat-change-up { @apply text-emerald-600 dark:text-emerald-400; }
+  .stat-change-down { @apply text-rose-600 dark:text-rose-400; }
+
+  /* Chip de emoji reutilizable (categorías, secciones) */
+  .emoji-chip {
+    @apply grid place-items-center w-10 h-10 rounded-xl text-lg shrink-0 bg-slate-100 dark:bg-slate-800;
+  }
+  .emoji-chip-sm { @apply w-8 h-8 rounded-lg text-base; }
+
+  /* ---------- Encabezado de página ---------- */
+  .page-title { @apply text-2xl lg:text-[1.7rem] font-bold text-slate-900 dark:text-white tracking-tight; }
+  .page-subtitle { @apply text-sm text-slate-500 dark:text-slate-400 mt-1; }
+  .section-title { @apply text-base font-bold text-slate-900 dark:text-white flex items-center gap-2; }
+
+  /* ---------- Formularios ---------- */
+  .input {
+    @apply block w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700
+           bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm
+           placeholder:text-slate-400 dark:placeholder:text-slate-500
+           shadow-sm transition
+           focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500;
+  }
+  .label { @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5; }
+  .hint { @apply text-xs text-slate-400 dark:text-slate-500 mt-1; }
+  .select {
+    @apply input pr-10 appearance-none bg-no-repeat cursor-pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 0.85rem center;
+  }
+  .textarea { @apply input; min-height: 5.5rem; }
+  .form-group { @apply space-y-1; }
+
+  /* ---------- Tablas ---------- */
+  .table { @apply w-full text-sm border-collapse; }
+  .table thead th {
+    @apply text-left px-4 py-3 text-xs font-bold uppercase tracking-wide
+           text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 whitespace-nowrap;
+  }
+  .table tbody td { @apply px-4 py-3 border-b border-slate-100 dark:border-slate-800/60 align-middle; }
+  .table tbody tr { @apply transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40; }
+  .table tbody tr:last-child td { @apply border-b-0; }
+
+  /* ---------- Badges ---------- */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold leading-none
+           ring-1 ring-inset;
+  }
+  .badge-green  { @apply bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20; }
+  .badge-red    { @apply bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-400/20; }
+  .badge-yellow { @apply bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20; }
+  .badge-blue   { @apply bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-400/20; }
+  .badge-gray   { @apply bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-700/40 dark:text-slate-300 dark:ring-slate-400/20; }
+  .badge-purple { @apply bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-400/20; }
+
+  .pill { @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300; }
+
+  /* ---------- Barras de progreso ---------- */
+  .progress-bar { @apply w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden; }
+  .progress-bar-fill { @apply h-full rounded-full transition-all duration-500 bg-primary-500; }
+
+  /* ---------- Calendario ---------- */
+  .cal-day {
+    @apply min-h-[84px] p-2 border-r border-b border-slate-100 dark:border-slate-800
+           hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors;
+  }
+  .cal-day-today { @apply bg-primary-50 dark:bg-primary-500/10 ring-1 ring-inset ring-primary-300 dark:ring-primary-500/40; }
+  .cal-day-other { @apply opacity-40; }
+
+  /* ---------- Tarjeta de crédito visual ---------- */
+  .cc-visual {
+    background: linear-gradient(135deg, var(--bank-color, #4f46e5) 0%, var(--bank-color-2, #1e1b4b) 100%);
+    @apply text-white relative overflow-hidden rounded-2xl shadow-lift;
+  }
+  .cc-visual::after {
+    content: '';
+    @apply absolute -right-12 -top-12 w-44 h-44 rounded-full;
+    background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+  }
+
+  /* Banda de color lateral (bancos/cuentas) */
+  .stripe-left { @apply relative overflow-hidden; }
+  .stripe-left::before {
+    content: '';
+    @apply absolute left-0 top-0 bottom-0 w-1.5;
+    background: var(--stripe, #4f46e5);
+  }
+
+  /* Estado vacío */
+  .empty-emoji { @apply grid place-items-center w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 text-3xl mb-4; }
+
+  /* ---------- Logos de banco / proveedor ---------- */
+  .bank-logo-sm {
+    @apply w-10 h-10 rounded-xl object-contain bg-white dark:bg-slate-800
+           border border-slate-200 dark:border-slate-700 p-1 shrink-0;
+  }
+  .bank-logo {
+    @apply w-14 h-14 rounded-2xl object-contain bg-white dark:bg-slate-800
+           border border-slate-200 dark:border-slate-700 p-1.5 shrink-0;
+  }
+  .bank-logo-xs {
+    @apply w-7 h-7 rounded-lg object-contain bg-white dark:bg-slate-800
+           border border-slate-200 dark:border-slate-700 p-0.5 shrink-0;
+  }
+
+  /* Banda de color del banco a la izquierda de una tarjeta */
+  .bank-stripe { @apply relative overflow-hidden; }
+  .bank-stripe::before {
+    content: '';
+    @apply absolute left-0 top-0 bottom-0 w-1.5;
+    background: var(--bank-color, #4f46e5);
+  }
+
+  /* ---------- Filas de la página de pago ---------- */
+  .pay-row {
+    @apply flex items-center justify-between py-2.5 text-sm
+           border-b border-slate-100 dark:border-slate-800/60;
+  }
+  .pay-row span:first-child { @apply text-slate-500 dark:text-slate-400; }
+  .pay-row-total {
+    @apply border-b-0 pt-3 mt-1 text-base font-bold border-t border-slate-200 dark:border-slate-700;
+  }
+
+  /* ---------- Reparto de gasto compartido ---------- */
+  .split-row {
+    @apply flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50;
+  }
+
+  /* Selector unificado de método de pago */
+  .pm-option {
+    @apply w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg text-left
+           text-slate-700 dark:text-slate-200
+           hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors;
+  }
+  .pm-group {
+    @apply px-3 pt-2.5 pb-1 text-[0.68rem] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500;
+  }
+
+  /* Prefijo $ para inputs de dinero */
+  .money-wrap { @apply relative; }
+  .money-wrap > .money-input { @apply pl-7; }
+  .money-wrap::before {
+    content: '$';
+    @apply absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium pointer-events-none z-10;
+  }
+}
+
+/* ----------------------------------------------------------------
+   UTILIDADES
+   ---------------------------------------------------------------- */
+@layer utilities {
+  .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .text-balance { text-wrap: balance; }
+  /* Oculta spinners de inputs number */
+  .no-spin::-webkit-outer-spin-button,
+  .no-spin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .no-spin { -moz-appearance: textfield; }
+}

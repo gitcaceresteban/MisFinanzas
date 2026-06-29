@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% block title %}{% if bill %}Editar{% else %}Nueva{% endif %} cuenta del hogar{% endblock %}
+{% block page_title %}{% if bill %}Editar{% else %}Nueva{% endif %} cuenta del hogar{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+    <div class="mb-6">
+        <a href="/hogar/" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i> Volver
+        </a>
+    </div>
+
+    <form method="POST" class="card-padded space-y-5"
+          x-data="{
+              split: '{{ bill.split_type if bill else 'equal' }}',
+              participants: {{ participants | tojson if participants else '[]' }}
+          }">
+
+        <div>
+            <label class="label">Nombre de la cuenta</label>
+            <input type="text" name="name" required class="input"
+                   value="{{ bill.name if bill else '' }}"
+                   placeholder="Ej: Cuenta de luz Marzo">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Categoría</label>
+                <select name="category_id" class="select">
+                    <option value="">— Sin categoría —</option>
+                    {% for c in categories %}
+                        <option value="{{ c.id }}" {% if bill and bill.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label">Monto total</label>
+                <input type="text" inputmode="numeric" name="amount" required class="input money-input"
+                       value="{{ bill.amount if bill else '' }}" placeholder="0">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Fecha vencimiento</label>
+                <input type="date" name="due_date" class="input"
+                       value="{{ bill.due_date if bill else '' }}">
+            </div>
+            <div>
+                <label class="label">Pagada por (persona)</label>
+                <select name="paid_by_person_id" class="select">
+                    <option value="">— Yo —</option>
+                    {% for p in people %}
+                        <option value="{{ p.id }}" {% if bill and bill.paid_by_person_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label class="label">Pagada desde cuenta</label>
+            <select name="paid_from_account_id" class="select">
+                <option value="">— Ninguna —</option>
+                {% for a in accounts %}
+                    <option value="{{ a.id }}" {% if bill and bill.paid_from_account_id == a.id %}selected{% endif %}>{{ a.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="label">Tipo de división</label>
+            <select name="split_type" class="select" x-model="split">
+                {% for v, l in split_types %}
+                    <option value="{{ v }}">{{ l }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Participantes -->
+        <div>
+            <div class="flex justify-between items-center mb-2">
+                <label class="label mb-0">Participantes</label>
+                <button type="button" @click="participants.push({person_id: '', share: 0, fixed: 0, percent: 0})"
+                        class="btn-ghost text-xs">
+                    <i data-lucide="plus" class="w-3 h-3"></i> Agregar
+                </button>
+            </div>
+            <template x-for="(part, idx) in participants" :key="idx">
+                <div class="grid grid-cols-12 gap-2 mb-2 items-center">
+                    <select :name="'participant_person_id_' + idx" x-model="part.person_id" class="select col-span-5">
+                        <option value="">— Persona —</option>
+                        {% for p in people %}
+                            <option value="{{ p.id }}">{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <input type="number" step="0.01" :name="'participant_fixed_' + idx" x-model="part.fixed"
+                           x-show="split === 'fixed' || split === 'custom'"
+                           class="input col-span-5" placeholder="Monto fijo">
+
+                    <input type="number" step="0.01" :name="'participant_percent_' + idx" x-model="part.percent"
+                           x-show="split === 'percent'"
+                           class="input col-span-5" placeholder="Porcentaje %">
+
+                    <div class="col-span-5 text-xs text-slate-500" x-show="split === 'equal'">División equitativa</div>
+
+                    <button type="button" @click="participants.splice(idx, 1)" class="col-span-2 btn-ghost text-xs">
+                        <i data-lucide="x" class="w-3.5 h-3.5 text-rose-500"></i>
+                    </button>
+                </div>
+            </template>
+            <input type="hidden" name="participants_count" :value="participants.length">
+        </div>
+
+        <div>
+            <label class="label">Notas</label>
+            <textarea name="notes" class="textarea" rows="2">{{ bill.notes if bill else '' }}</textarea>
+        </div>
+
+        <div class="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button type="submit" class="btn-primary">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>{{ 'Guardar' if bill else 'Crear cuenta' }}</span>
+            </button>
+            <a href="/hogar/" class="btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

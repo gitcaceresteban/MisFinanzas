@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}Bancos{% endblock %}
+{% block page_title %}Bancos{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-bold">Bancos</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                {{ banks | length }} institución(es). Puedes agregar más manualmente.
+            </p>
+        </div>
+        <a href="/bancos/nuevo" class="btn-primary">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Nuevo banco</span>
+        </a>
+    </div>
+
+    {% if banks %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for b in banks %}
+            <div class="card overflow-hidden group">
+                <div class="h-24 relative" style="background: linear-gradient(135deg, {{ b.color }} 0%, {{ b.color_secondary or b.color }} 100%);">
+                    <div class="absolute inset-0 bg-black/20"></div>
+                    <div class="absolute inset-0 p-4 flex items-end gap-3">
+                        {% if b.logo_path %}
+                            <img src="/bancos/logo/{{ b.logo_path }}" alt="" class="w-12 h-12 rounded-xl bg-white object-contain p-1 shadow-md shrink-0">
+                        {% endif %}
+                        <div class="text-white">
+                            <div class="font-bold text-lg drop-shadow-md">{{ b.name }}</div>
+                            <div class="text-xs opacity-80">{{ b.country or 'CL' }}</div>
+                        </div>
+                    </div>
+                    {% if b.is_seeded %}
+                        <span class="absolute top-2 right-2 text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">precargado</span>
+                    {% endif %}
+                </div>
+                <div class="p-4">
+                    <div class="flex justify-between text-sm mb-3">
+                        <div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">Cuentas</div>
+                            <div class="font-semibold">{{ b.accounts_count }}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">Tarjetas</div>
+                            <div class="font-semibold">{{ b.cards_count }}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">Créditos</div>
+                            <div class="font-semibold">{{ b.loans_count }}</div>
+                        </div>
+                    </div>
+                    {% if b.total_balance %}
+                        <div class="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                            Saldo total: <span class="font-semibold num text-slate-800 dark:text-white">{{ b.total_balance | clp }}</span>
+                        </div>
+                    {% endif %}
+                    <div class="flex gap-2">
+                        <a href="/bancos/{{ b.id }}/editar" class="btn-secondary flex-1 justify-center text-xs">
+                            <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                            Editar
+                        </a>
+                        <form action="/bancos/{{ b.id }}/eliminar" method="POST"
+                              data-confirm="¿Desactivar {{ b.name }}? Sus cuentas seguirán existiendo.">
+                            <button type="submit" class="btn-secondary px-3">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-500"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        {% with icon='building-2', title='No hay bancos', message='Aún no hay bancos. Agrega tu primero.', action_url='/bancos/nuevo', action_label='Agregar banco' %}
+            {% include 'partials/empty_state.html' %}
+        {% endwith %}
+    {% endif %}
+
+</div>
+{% endblock %}

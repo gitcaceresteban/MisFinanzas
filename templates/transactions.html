@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}Gastos{% endblock %}
+{% block page_title %}Gastos{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold">Gastos y movimientos</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{ transactions | length }} resultado(s)</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/gastos/exportar" class="btn-secondary text-sm">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Exportar CSV</span>
+            </a>
+            <a href="/gastos/nuevo" class="btn-primary">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Nuevo gasto</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="stat-card">
+            <div class="stat-label">Gastos filtrados</div>
+            <div class="stat-value num text-rose-600 dark:text-rose-400">{{ total_expenses | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Ingresos filtrados</div>
+            <div class="stat-value num text-emerald-600 dark:text-emerald-400">{{ total_incomes | clp }}</div>
+        </div>
+        <div class="stat-card hidden lg:block">
+            <div class="stat-label">Neto</div>
+            <div class="stat-value num">{{ (total_incomes - total_expenses) | clp }}</div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card-padded">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <input type="text" name="q" value="{{ filters.q or '' }}" class="input" placeholder="Buscar...">
+            <select name="category" class="select">
+                <option value="">Categoría</option>
+                {% for c in categories %}
+                    <option value="{{ c.id }}" {% if filters.category|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="type" class="select">
+                <option value="">Tipo</option>
+                <option value="expense" {% if filters.type == 'expense' %}selected{% endif %}>Gasto</option>
+                <option value="income" {% if filters.type == 'income' %}selected{% endif %}>Ingreso</option>
+                <option value="transfer" {% if filters.type == 'transfer' %}selected{% endif %}>Transferencia</option>
+            </select>
+            <select name="status" class="select">
+                <option value="">Estado</option>
+                {% for v, l in statuses %}
+                    <option value="{{ v }}" {% if filters.status == v %}selected{% endif %}>{{ l }}</option>
+                {% endfor %}
+            </select>
+            <select name="account" class="select">
+                <option value="">Cuenta</option>
+                {% for a in accounts %}
+                    <option value="{{ a.id }}" {% if filters.account|string == a.id|string %}selected{% endif %}>{{ a.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="card" class="select">
+                <option value="">Tarjeta</option>
+                {% for c in cards %}
+                    <option value="{{ c.id }}" {% if filters.card|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="date" name="date_from" value="{{ filters.date_from or '' }}" class="input">
+            <input type="date" name="date_to" value="{{ filters.date_to or '' }}" class="input">
+            <div class="md:col-span-2 lg:col-span-4 flex gap-2">
+                <button type="submit" class="btn-primary"><i data-lucide="filter" class="w-4 h-4"></i>Filtrar</button>
+                <a href="/gastos/" class="btn-secondary">Limpiar</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla -->
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Descripción</th>
+                        <th>Categoría</th>
+                        <th>Origen</th>
+                        <th>Estado</th>
+                        <th class="text-right">Monto</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in transactions %}
+                        <tr>
+                            <td class="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ t.date | fecha }}</td>
+                            <td>
+                                <div class="font-medium">{{ t.description or '—' }}</div>
+                                {% if t.transaction_type == 'installments' %}
+                                    <div class="text-xs text-violet-600 dark:text-violet-400">{{ t.installments_total }} cuotas</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if t.category_name %}
+                                    <span class="badge" style="background-color: {{ t.category_color }}20; color: {{ t.category_color }};">
+                                        {{ t.category_name }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-xs text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                {{ t.account_name or t.card_name or '—' }}
+                            </td>
+                            <td><span class="badge badge-{{ t.status | status_color }} capitalize">{{ t.status }}</span></td>
+                            <td class="text-right font-semibold num whitespace-nowrap {% if t.type == 'income' %}text-emerald-600 dark:text-emerald-400{% elif t.type == 'transfer' %}text-slate-500{% else %}text-slate-900 dark:text-white{% endif %}">
+                                {% if t.type == 'income' %}+{% elif t.type == 'expense' %}-{% endif %}{{ t.amount | clp }}
+                            </td>
+                            <td class="text-right">
+                                <div class="flex justify-end gap-1">
+                                    <a href="/gastos/{{ t.id }}/editar" class="btn-ghost text-xs p-1.5" title="Editar"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></a>
+                                    <form action="/gastos/{{ t.id }}/duplicar" method="POST" class="inline">
+                                        <button type="submit" class="btn-ghost text-xs p-1.5" title="Duplicar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                    </form>
+                                    <form action="/gastos/{{ t.id }}/eliminar" method="POST" class="inline" data-confirm="¿Eliminar este movimiento?">
+                                        <button type="submit" class="btn-ghost text-xs p-1.5" title="Eliminar"><i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-500"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="text-center py-12 text-slate-400 text-sm">No hay movimientos. <a href="/gastos/nuevo" class="text-primary-600 hover:underline">Crear el primero</a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

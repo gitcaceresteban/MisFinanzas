@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block title %}Cuentas del hogar{% endblock %}
+{% block page_title %}Cuentas del hogar{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold">Cuentas del hogar</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Gastos compartidos y división con personas</p>
+        </div>
+        <a href="/hogar/nueva" class="btn-primary">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Nueva cuenta</span>
+        </a>
+    </div>
+
+    <!-- Resumen -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="stat-card">
+            <div class="stat-label">Pendientes</div>
+            <div class="stat-value num">{{ total_pending_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Monto pendiente</div>
+            <div class="stat-value num text-rose-600 dark:text-rose-400">{{ total_pending_amount | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Por cobrar</div>
+            <div class="stat-value num text-emerald-600 dark:text-emerald-400">{{ total_to_collect | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Pagadas (mes)</div>
+            <div class="stat-value num">{{ total_paid_month | clp }}</div>
+        </div>
+    </div>
+
+    {% if bills %}
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Cuenta</th>
+                        <th>Categoría</th>
+                        <th>Participantes</th>
+                        <th>Estado</th>
+                        <th class="text-right">Monto</th>
+                        <th class="text-right">Pendiente</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in bills %}
+                        <tr>
+                            <td class="text-xs text-slate-500 whitespace-nowrap">{{ b.due_date | fecha if b.due_date else '—' }}</td>
+                            <td class="font-medium">{{ b.name }}</td>
+                            <td><span class="text-xs">{{ b.category_name or '—' }}</span></td>
+                            <td class="text-xs">{{ b.participants_count }}</td>
+                            <td><span class="badge badge-{{ b.status | status_color }} capitalize">{{ b.status }}</span></td>
+                            <td class="text-right font-semibold num">{{ b.amount | clp }}</td>
+                            <td class="text-right font-medium num {% if b.pending_to_collect > 0 %}text-rose-600 dark:text-rose-400{% endif %}">
+                                {{ b.pending_to_collect | clp }}
+                            </td>
+                            <td class="text-right">
+                                <div class="flex justify-end gap-1">
+                                    <a href="/hogar/{{ b.id }}" class="btn-ghost p-1.5" title="Ver"><i data-lucide="eye" class="w-3.5 h-3.5"></i></a>
+                                    {% if b.status != 'pagada' %}
+                                    <form action="/hogar/{{ b.id }}/marcar-pagada" method="POST">
+                                        <button type="submit" class="btn-ghost p-1.5" title="Marcar pagada"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                                    </form>
+                                    {% endif %}
+                                    <a href="/hogar/{{ b.id }}/editar" class="btn-ghost p-1.5" title="Editar"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></a>
+                                    <form action="/hogar/{{ b.id }}/eliminar" method="POST" data-confirm="¿Eliminar esta cuenta del hogar?">
+                                        <button type="submit" class="btn-ghost p-1.5" title="Eliminar"><i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-500"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+        {% with icon='home', title='Sin cuentas del hogar', message='Aquí van los gastos compartidos: arriendo, servicios, comida común... y se divide entre los participantes.', action_url='/hogar/nueva', action_label='Crear primera' %}
+            {% include 'partials/empty_state.html' %}
+        {% endwith %}
+    {% endif %}
+
+</div>
+{% endblock %}

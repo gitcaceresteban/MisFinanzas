@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}Créditos{% endblock %}
+{% block page_title %}Créditos{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold">📉 Créditos y compras en cuotas</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Consumos, avances, súper avances y compras en cuotas (facturadas en tu tarjeta).</p>
+        </div>
+        <a href="/creditos/nuevo" class="btn-primary">
+            <span class="text-sm leading-none">➕</span>
+            <span>Nuevo crédito</span>
+        </a>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="stat-card">
+            <div class="stat-label">Créditos activos</div>
+            <div class="stat-value num">{{ active_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Deuda pendiente</div>
+            <div class="stat-value num text-rose-600 dark:text-rose-400">{{ total_pending | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Cuota mensual total</div>
+            <div class="stat-value num">{{ total_monthly | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Monto solicitado</div>
+            <div class="stat-value num text-slate-500 dark:text-slate-400">{{ total_original | clp }}</div>
+        </div>
+    </div>
+
+    {% if loans %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {% for l in loans %}
+            {% set pct = (l.paid_installments / l.total_installments * 100) if l.total_installments else 0 %}
+            <div class="card-padded bank-stripe {% if l.status != 'vigente' %}opacity-70{% endif %}" style="--bank-color: {{ l.bank_color or '#8b5cf6' }};">
+                <div class="flex justify-between items-start mb-3">
+                    <div class="flex items-start gap-3">
+                        {% if l.bank_logo %}
+                            <img src="/bancos/logo/{{ l.bank_logo }}" alt="" class="bank-logo-sm">
+                        {% else %}
+                            <div class="bank-logo-sm grid place-items-center text-lg" style="background: {{ l.bank_color or '#8b5cf6' }}1a;">🏦</div>
+                        {% endif %}
+                        <div>
+                            <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                <span class="badge badge-purple">{{ l.type | loan_type }}</span>
+                                <span class="badge badge-{{ l.status | status_color }} capitalize">{{ l.status }}</span>
+                            </div>
+                            <div class="font-semibold">{{ l.name }}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">
+                                {{ l.bank_name or l.entity or '—' }}{% if l.billed_in_card and l.card_name %} · se factura en {{ l.card_name }}{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-3 text-sm">
+                    <div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Pendiente</div>
+                        <div class="font-bold num text-rose-600 dark:text-rose-400">{{ l.pending_amount | clp }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Cuota</div>
+                        <div class="font-bold num">{{ l.installment_amount | clp }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Cuotas</div>
+                        <div class="font-medium num">{{ l.paid_installments }}/{{ l.total_installments }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Próximo pago</div>
+                        <div class="font-medium">{{ l.next_payment_date | fecha if l.next_payment_date else '—' }}</div>
+                    </div>
+                </div>
+
+                <div class="progress-bar mb-1">
+                    <div class="progress-bar-fill bg-emerald-500" style="width: {{ pct }}%;"></div>
+                </div>
+                <div class="text-xs text-center text-slate-500 dark:text-slate-400 mb-3">
+                    {{ pct | round(1) }}% pagado
+                </div>
+
+                <div class="flex gap-2">
+                    {% if l.status == 'vigente' %}
+                    <a href="/creditos/{{ l.id }}/pagar" class="btn-primary flex-1 justify-center text-xs">
+                        💸 Pagar cuota
+                    </a>
+                    {% endif %}
+                    <a href="/creditos/{{ l.id }}" class="btn-secondary flex-1 justify-center text-xs">
+                        👁️ Ver
+                    </a>
+                    <a href="/creditos/{{ l.id }}/editar" class="btn-secondary px-3" title="Editar">✏️</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        {% with icon='trending-down', title='Sin créditos', message='Registra tus créditos de consumo, avances, súper avances o compras en cuotas.', action_url='/creditos/nuevo', action_label='Agregar crédito' %}
+            {% include 'partials/empty_state.html' %}
+        {% endwith %}
+    {% endif %}
+</div>
+{% endblock %}

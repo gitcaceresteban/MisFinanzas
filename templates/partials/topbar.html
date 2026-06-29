@@ -1,0 +1,59 @@
+<!-- Topbar -->
+<header class="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+    <div class="flex items-center justify-between px-4 lg:px-8 h-16">
+
+        <!-- Toggle sidebar móvil -->
+        <button @click="sidebar = !sidebar" class="lg:hidden icon-btn" aria-label="Abrir menú">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+
+        <!-- Título de página (derivado de la ruta; el topbar es un include) -->
+        {% set _titles = {
+            '': '📊 Dashboard', 'gastos': '💸 Gastos y movimientos', 'ingresos': '💰 Ingresos',
+            'recurrentes': '🔁 Pagos recurrentes', 'bancos': '🏦 Bancos', 'cuentas': '💵 Cuentas',
+            'tarjetas': '💳 Tarjetas de crédito', 'creditos': '📉 Créditos y compras en cuotas',
+            'personas': '👥 Personas', 'hogar': '🏠 Cuentas del hogar', 'presupuestos': '🎯 Presupuestos',
+            'plan': '🧮 Plan & escenarios',
+            'flujo': '📈 Flujo de caja', 'calendario': '📅 Calendario', 'alertas': '🔔 Alertas',
+            'ajustes': '⚙️ Ajustes', 'backup': '💾 Backups'
+        } %}
+        <div class="hidden lg:block">
+            <h1 class="text-xl font-bold">{{ _titles.get(request.path.split('/')[1], 'Motor Financiero') }}</h1>
+        </div>
+
+        <!-- Acciones rápidas -->
+        <div class="flex items-center gap-1.5">
+            <a href="/gastos/nuevo" class="btn-primary btn-sm">
+                <span class="text-sm leading-none">➕</span>
+                <span class="hidden sm:inline">Nuevo gasto</span>
+            </a>
+
+            <a href="/alertas/" class="icon-btn" title="Alertas" aria-label="Alertas">
+                <span class="text-lg leading-none">🔔</span>
+            </a>
+
+            <!-- Selector de tema -->
+            <div x-data="{ open: false, theme: (localStorage.getItem('theme') || 'auto') }" class="relative">
+                <button @click="open = !open" class="icon-btn" title="Tema" aria-label="Cambiar tema">
+                    <span class="text-lg leading-none hidden dark:inline">🌙</span>
+                    <span class="text-lg leading-none dark:hidden">☀️</span>
+                </button>
+                <div x-show="open" @click.outside="open = false" x-transition x-cloak
+                     class="absolute right-0 top-12 w-44 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lift p-1.5 z-30">
+                    <button @click="setTheme('light'); theme='light'; open=false"
+                            class="theme-option" :class="theme==='light' && 'theme-option-active'">
+                        <span class="text-base leading-none">☀️</span><span>Claro</span>
+                    </button>
+                    <button @click="setTheme('dark'); theme='dark'; open=false"
+                            class="theme-option" :class="theme==='dark' && 'theme-option-active'">
+                        <span class="text-base leading-none">🌙</span><span>Oscuro</span>
+                    </button>
+                    <button @click="setTheme('auto'); theme='auto'; open=false"
+                            class="theme-option" :class="theme==='auto' && 'theme-option-active'">
+                        <span class="text-base leading-none">🖥️</span><span>Automático</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>

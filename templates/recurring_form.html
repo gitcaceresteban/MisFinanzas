@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% block title %}{% if payment %}Editar{% else %}Nuevo{% endif %} recurrente{% endblock %}
+{% block page_title %}{% if payment %}Editar{% else %}Nuevo{% endif %} pago recurrente{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+    <div class="mb-6">
+        <a href="/recurrentes/" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <span>←</span> Volver
+        </a>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="card-padded space-y-5">
+        <!-- Logo del proveedor -->
+        <div>
+            <label class="label">Logo del proveedor (opcional)</label>
+            <div class="flex items-center gap-4">
+                {% if payment and payment.logo_path %}
+                    <img src="/recurrentes/logo/{{ payment.logo_path }}" alt="logo" class="bank-logo">
+                {% else %}
+                    <div class="bank-logo grid place-items-center text-2xl">🔁</div>
+                {% endif %}
+                <input type="file" name="logo" accept="image/*"
+                       class="input flex-1 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-primary-50 file:text-primary-700 file:font-medium dark:file:bg-primary-500/10 dark:file:text-primary-300">
+            </div>
+            <p class="hint">Ej: sube el logo de Entel, Spotify, etc. para reconocerlo de un vistazo.</p>
+        </div>
+
+        <div>
+            <label class="label">Nombre *</label>
+            <input type="text" name="name" required class="input"
+                   value="{{ payment.name if payment else '' }}"
+                   placeholder="Ej: Netflix, Cuenta de luz, Entel">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Categoría</label>
+                <select name="category_id" class="select">
+                    <option value="">— Sin categoría —</option>
+                    {% for c in categories %}
+                        <option value="{{ c.id }}" {% if payment and payment.category_id == c.id %}selected{% endif %}>{{ c.icon | emoji }} {{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label">Monto *</label>
+                <input type="text" inputmode="numeric" name="amount" required class="input money-input"
+                       value="{{ payment.amount if payment else '' }}" placeholder="0">
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+            <input type="checkbox" name="amount_is_fixed" id="amount_is_fixed"
+                   {% if payment and payment.amount_is_fixed %}checked{% elif not payment %}checked{% endif %}
+                   class="w-4 h-4 rounded">
+            <label for="amount_is_fixed" class="text-sm">Monto fijo (desmarca si varía mes a mes)</label>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="label">Grupo</label>
+                <input type="text" name="group_name" class="input" list="group_list"
+                       value="{{ payment.group_name if payment and payment.group_name else '' }}"
+                       placeholder="Ej: Suscripciones, Teléfono">
+                <datalist id="group_list">
+                    {% for g in group_names %}<option value="{{ g }}">{% endfor %}
+                </datalist>
+                <p class="hint">Agrupa para ver el total por grupo.</p>
+            </div>
+            <div>
+                <label class="label">Frecuencia</label>
+                <select name="frequency" class="select">
+                    {% for v, l in frequencies %}
+                        <option value="{{ v }}" {% if payment and payment.frequency == v %}selected{% endif %}>{{ l }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label">Día del mes</label>
+                <input type="number" min="1" max="31" name="day_of_month" class="input"
+                       value="{{ payment.day_of_month if payment else '' }}" placeholder="Ej: 5">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Cuenta de pago</label>
+                <select name="account_id" class="select">
+                    <option value="">— Ninguna —</option>
+                    {% for a in accounts %}
+                        <option value="{{ a.id }}" {% if payment and payment.account_id == a.id %}selected{% endif %}>{{ a.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label">Tarjeta</label>
+                <select name="card_id" class="select">
+                    <option value="">— Ninguna —</option>
+                    {% for c in cards %}
+                        <option value="{{ c.id }}" {% if payment and payment.card_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Reembolsable (cuentas de otra persona que yo pago) -->
+        <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 space-y-3">
+            <label class="inline-flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input type="checkbox" name="is_reimbursable" id="is_reimbursable" class="w-4 h-4 rounded"
+                       {% if payment and payment.is_reimbursable %}checked{% endif %}
+                       onchange="document.getElementById('reimb_person').classList.toggle('hidden', !this.checked)">
+                💸 Lo pago yo pero me lo devuelven (ej. cuenta de un tío)
+            </label>
+            <div id="reimb_person" class="{% if not (payment and payment.is_reimbursable) %}hidden{% endif %}">
+                <label class="label">¿Quién me lo devuelve?</label>
+                <select name="person_id" class="select">
+                    <option value="">— Selecciona persona —</option>
+                    {% for p in people %}
+                        <option value="{{ p.id }}" {% if payment and payment.person_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="hint">Al registrar el pago se creará una cuenta por cobrar a esta persona.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Fecha inicio</label>
+                <input type="date" name="start_date" class="input"
+                       value="{{ payment.start_date if payment and payment.start_date else today }}">
+            </div>
+            <div>
+                <label class="label">Fecha fin (opcional)</label>
+                <input type="date" name="end_date" class="input"
+                       value="{{ payment.end_date if payment else '' }}">
+            </div>
+        </div>
+
+        {% if payment %}
+        <div class="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+            <input type="checkbox" name="active" id="active"
+                   {% if payment.active %}checked{% endif %}
+                   class="w-4 h-4 rounded">
+            <label for="active" class="text-sm">Activo</label>
+        </div>
+        {% endif %}
+
+        <div>
+            <label class="label">Notas</label>
+            <textarea name="notes" class="textarea" rows="2">{{ payment.notes if payment else '' }}</textarea>
+        </div>
+
+        <div class="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button type="submit" class="btn-primary">
+                ✅ <span>{{ 'Guardar cambios' if payment else 'Crear' }}</span>
+            </button>
+            <a href="/recurrentes/" class="btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

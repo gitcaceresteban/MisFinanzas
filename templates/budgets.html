@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block title %}Presupuestos{% endblock %}
+{% block page_title %}Presupuestos{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold">Presupuestos</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                {{ month | month_es }} {{ year }} · {{ budgets | length }} activo(s)
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <form method="GET" class="flex gap-2 items-center">
+                <select name="year" class="select text-sm">
+                    {% for y in years %}
+                        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+                <select name="month" class="select text-sm">
+                    {% for m in range(1, 13) %}
+                        <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m | month_es }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-secondary text-sm"><i data-lucide="filter" class="w-4 h-4"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Crear nuevo -->
+    <div class="card-padded">
+        <h3 class="text-base font-semibold mb-4">Crear presupuesto</h3>
+        <form method="POST" action="/presupuestos/nuevo" class="grid grid-cols-1 md:grid-cols-5 gap-3"
+              x-data="{ scope: 'category' }">
+            <select name="scope" x-model="scope" class="select">
+                <option value="category">Por categoría</option>
+                <option value="account">Por cuenta</option>
+                <option value="person">Por persona</option>
+                <option value="total">Total general</option>
+            </select>
+            <select name="category_id" class="select" x-show="scope === 'category'">
+                <option value="">— Categoría —</option>
+                {% for c in categories %}
+                    <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="account_id" class="select" x-show="scope === 'account'">
+                <option value="">— Cuenta —</option>
+                {% for a in accounts %}
+                    <option value="{{ a.id }}">{{ a.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="person_id" class="select" x-show="scope === 'person'">
+                <option value="">— Persona —</option>
+                {% for p in people %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" inputmode="numeric" name="amount" required class="input money-input" placeholder="Monto presupuesto">
+            <input type="hidden" name="year" value="{{ year }}">
+            <input type="hidden" name="month" value="{{ month }}">
+            <button type="submit" class="btn-primary justify-center">
+                <i data-lucide="plus" class="w-4 h-4"></i> Crear
+            </button>
+        </form>
+    </div>
+
+    {% if budgets %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {% for b in budgets %}
+            <div class="card-padded">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="badge badge-blue capitalize">{{ b.scope }}</span>
+                            {% if b.scope == 'category' %}
+                                <span class="badge" style="background-color: {{ b.category_color }}20; color: {{ b.category_color }};">{{ b.category_name }}</span>
+                            {% elif b.scope == 'account' %}
+                                <span class="text-sm font-medium">{{ b.account_name }}</span>
+                            {% elif b.scope == 'person' %}
+                                <span class="text-sm font-medium">{{ b.person_name }}</span>
+                            {% else %}
+                                <span class="text-sm font-medium">Todos los gastos</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">
+                            Presupuesto: <span class="font-bold num">{{ b.amount | clp }}</span>
+                        </div>
+                    </div>
+                    <form action="/presupuestos/{{ b.id }}/eliminar" method="POST" data-confirm="¿Eliminar presupuesto?">
+                        <button type="submit" class="btn-ghost p-1.5"><i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-500"></i></button>
+                    </form>
+                </div>
+
+                <div class="flex justify-between items-baseline mb-2">
+                    <span class="text-sm text-slate-500">Gastado</span>
+                    <div class="text-right">
+                        <div class="text-lg font-bold num {% if b.over %}text-rose-600 dark:text-rose-400{% endif %}">{{ b.spent | clp }}</div>
+                        <div class="text-xs text-slate-500">de {{ b.amount | clp }} ({{ b.pct }}%)</div>
+                    </div>
+                </div>
+
+                <div class="progress-bar mb-2">
+                    <div class="progress-bar-fill"
+                         style="width: {{ b.pct if b.pct <= 100 else 100 }}%;
+                                background-color: {% if b.over %}#f43f5e{% elif b.pct >= 80 %}#f59e0b{% else %}#10b981{% endif %};"></div>
+                </div>
+
+                {% if b.over %}
+                    <div class="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                        ⚠ Excedido por {{ (b.spent - b.amount) | clp }}
+                    </div>
+                {% elif b.pct >= 80 %}
+                    <div class="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        ⚠ Cerca del límite ({{ (b.amount - b.spent) | clp }} restantes)
+                    </div>
+                {% else %}
+                    <div class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                        ✓ {{ (b.amount - b.spent) | clp }} disponibles
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        {% with icon='target', title='Sin presupuestos', message='Define cuánto quieres gastar este mes en cada categoría o cuenta.' %}
+            {% include 'partials/empty_state.html' %}
+        {% endwith %}
+    {% endif %}
+</div>
+{% endblock %}

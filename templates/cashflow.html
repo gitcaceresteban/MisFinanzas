@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}Flujo de caja{% endblock %}
+{% block page_title %}Flujo de caja proyectado{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold">Flujo de caja proyectado</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Proyección de tu saldo en los próximos {{ days }} días</p>
+        </div>
+        <form method="GET" class="flex gap-2">
+            <select name="days" class="select text-sm">
+                {% for d in [30, 60, 90, 180, 365] %}
+                    <option value="{{ d }}" {% if d == days %}selected{% endif %}>{{ d }} días</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn-secondary text-sm">Ver</button>
+        </form>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div class="stat-card">
+            <div class="stat-label">Saldo actual</div>
+            <div class="stat-value num">{{ initial_balance | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Saldo proyectado final</div>
+            <div class="stat-value num {% if final_balance < 0 %}text-rose-600 dark:text-rose-400{% else %}text-emerald-600 dark:text-emerald-400{% endif %}">
+                {{ final_balance | clp }}
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Saldo mínimo proyectado</div>
+            <div class="stat-value num {% if min_balance < 0 %}text-rose-600 dark:text-rose-400{% else %}text-amber-600 dark:text-amber-400{% endif %}">
+                {{ min_balance | clp }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico -->
+    <div class="card-padded">
+        <h3 class="text-base font-semibold mb-4">Evolución del saldo</h3>
+        <div class="h-72">
+            <canvas id="cashflowChart"></canvas>
+        </div>
+        {% if min_balance < 0 %}
+            <div class="mt-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-sm text-rose-700 dark:text-rose-300">
+                ⚠ Atención: tu saldo se proyecta negativo en algún punto. Considera ajustar gastos o programar ingresos.
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Tabla de eventos -->
+    <div class="card overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+            <h3 class="text-base font-semibold">Detalle día a día</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Eventos</th>
+                        <th class="text-right">Ingresos</th>
+                        <th class="text-right">Gastos</th>
+                        <th class="text-right">Neto</th>
+                        <th class="text-right">Saldo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in flow %}
+                        {% if f.events %}
+                            <tr>
+                                <td class="text-xs text-slate-500 whitespace-nowrap">{{ f.date | fecha }}</td>
+                                <td>
+                                    <div class="space-y-0.5">
+                                        {% for e in f.events %}
+                                            <div class="text-xs">
+                                                <span class="font-medium">{{ e.title }}</span>
+                                                <span class="num {% if e.amount > 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">
+                                                    {{ e.amount | clp }}
+                                                </span>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                                <td class="text-right num text-xs text-emerald-600 dark:text-emerald-400">{{ f.inflows | clp }}</td>
+                                <td class="text-right num text-xs text-rose-600 dark:text-rose-400">{{ f.outflows | clp }}</td>
+                                <td class="text-right font-semibold num text-sm {% if f.net > 0 %}text-emerald-600 dark:text-emerald-400{% elif f.net < 0 %}text-rose-600 dark:text-rose-400{% endif %}">
+                                    {{ f.net | clp }}
+                                </td>
+                                <td class="text-right font-bold num {% if f.balance < 0 %}text-rose-600 dark:text-rose-400{% endif %}">
+                                    {{ f.balance | clp }}
+                                </td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        window.makeCashflowChart('cashflowChart', {{ flow | tojson }});
+    });
+</script>
+{% endblock %}

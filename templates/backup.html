@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Backups{% endblock %}
+{% block page_title %}Backups{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-4xl">
+
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold">Respaldos</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Snapshots manuales de tu base de datos
+            </p>
+        </div>
+        <form action="/backup/crear" method="POST">
+            <button type="submit" class="btn-primary">
+                <i data-lucide="database-backup" class="w-4 h-4"></i>
+                Crear backup ahora
+            </button>
+        </form>
+    </div>
+
+    <div class="card-padded">
+        <div class="text-xs text-slate-500 dark:text-slate-400 mb-4">
+            <p>📁 Directorio: <code class="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{{ backup_dir }}</code></p>
+            <p class="mt-2">💡 Los backups antiguos se eliminan automáticamente. Para automatizar respaldos diarios usa el script <code>backup.sh</code> con cron.</p>
+        </div>
+    </div>
+
+    {% if backups %}
+    <div class="card overflow-hidden">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Archivo</th>
+                    <th>Tamaño</th>
+                    <th>Fecha</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in backups %}
+                    <tr>
+                        <td class="font-mono text-sm">{{ b.name }}</td>
+                        <td class="text-sm">{{ b.size_kb }} KB</td>
+                        <td class="text-sm text-slate-500">{{ b.modified }}</td>
+                        <td class="text-right">
+                            <div class="flex justify-end gap-1">
+                                <a href="/backup/{{ b.name }}" class="btn-ghost text-xs" title="Descargar">
+                                    <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                </a>
+                                <form action="/backup/{{ b.name }}/eliminar" method="POST" data-confirm="¿Eliminar este backup?">
+                                    <button type="submit" class="btn-ghost text-xs">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-500"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        {% with icon='database', title='Sin backups todavía', message='Aún no has creado respaldos. Te recomendamos crear uno antes de hacer cambios importantes.' %}
+            {% include 'partials/empty_state.html' %}
+        {% endwith %}
+    {% endif %}
+
+</div>
+{% endblock %}

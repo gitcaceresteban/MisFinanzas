@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block title %}{{ card.name }}{% endblock %}
+{% block page_title %}{{ card.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="mb-2">
+        <a href="/tarjetas/" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i> Volver
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Card visual -->
+        <div class="lg:col-span-1">
+            <div class="cc-visual rounded-2xl p-5 h-44 flex flex-col justify-between text-white shadow-lg"
+                 style="--bank-color: {{ card.bank_color or '#3b82f6' }};">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="text-xs opacity-75 uppercase tracking-wider">{{ card.bank_name or 'Tarjeta' }}</div>
+                        <div class="text-lg font-bold mt-1">{{ card.name }}</div>
+                    </div>
+                    <i data-lucide="credit-card" class="w-7 h-7 opacity-80"></i>
+                </div>
+                <div>
+                    <div class="text-xs opacity-75">Disponible</div>
+                    <div class="text-3xl font-bold num">{{ card.available_limit | clp }}</div>
+                </div>
+            </div>
+
+            <div class="card-padded mt-4 space-y-3">
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-500 dark:text-slate-400">Cupo total</span>
+                    <span class="font-semibold num">{{ card.credit_limit | clp }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-500 dark:text-slate-400">Usado</span>
+                    <span class="font-semibold num text-rose-600 dark:text-rose-400">{{ card.used_amount | clp }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-500 dark:text-slate-400">Facturado</span>
+                    <span class="font-semibold num">{{ card.billed_amount | clp }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-500 dark:text-slate-400">No facturado</span>
+                    <span class="font-semibold num">{{ card.unbilled_amount | clp }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-500 dark:text-slate-400">Cuotas futuras</span>
+                    <span class="font-semibold num text-violet-600 dark:text-violet-400">{{ card.future_installments_amount | clp }}</span>
+                </div>
+                <hr class="border-slate-100 dark:border-slate-800">
+                <div class="flex gap-2">
+                    {% if card.billing_day %}
+                        <div class="badge badge-blue">
+                            <i data-lucide="calendar" class="w-3 h-3"></i>
+                            Factura {{ card.billing_day }}
+                        </div>
+                    {% endif %}
+                    {% if card.payment_day %}
+                        <div class="badge badge-yellow">
+                            <i data-lucide="alert-circle" class="w-3 h-3"></i>
+                            Paga {{ card.payment_day }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <a href="/tarjetas/{{ card.id }}/editar" class="btn-secondary flex-1 justify-center">
+                        <i data-lucide="edit-2" class="w-4 h-4"></i> Editar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detalles -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Cuotas pendientes -->
+            <div class="card-padded">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-semibold">Cuotas pendientes ({{ installments | length }})</h3>
+                </div>
+                {% if installments %}
+                    <div class="overflow-x-auto -mx-5">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Fecha estimada</th>
+                                    <th>Estado</th>
+                                    <th class="text-right">Monto</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for i in installments %}
+                                    <tr>
+                                        <td class="text-sm">{{ i.installment_number }} / {{ i.total_installments }}</td>
+                                        <td class="text-sm text-slate-500 dark:text-slate-400">{{ i.estimated_date | fecha }}</td>
+                                        <td><span class="badge badge-{{ i.status | status_color }} capitalize">{{ i.status }}</span></td>
+                                        <td class="text-right num font-semibold">{{ i.amount | clp }}</td>
+                                        <td class="text-right">
+                                            <div class="flex justify-end gap-1">
+                                                <form action="/tarjetas/cuotas/{{ i.id }}/marcar-facturada" method="POST">
+                                                    <button type="submit" class="btn-ghost text-xs px-2 py-1" title="Marcar facturada"><i data-lucide="file-text" class="w-3 h-3"></i></button>
+                                                </form>
+                                                <form action="/tarjetas/cuotas/{{ i.id }}/marcar-pagada" method="POST">
+                                                    <button type="submit" class="btn-ghost text-xs px-2 py-1" title="Marcar pagada"><i data-lucide="check" class="w-3 h-3"></i></button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-sm text-slate-400 text-center py-6">Sin cuotas pendientes 🎉</p>
+                {% endif %}
+            </div>
+
+            <!-- Resumen mensual -->
+            {% if monthly_summary %}
+                <div class="card-padded">
+                    <h3 class="text-base font-semibold mb-4">Próximos meses</h3>
+                    <div class="space-y-2">
+                        {% for m in monthly_summary %}
+                            <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                                <div class="text-sm font-medium">{{ m.month }}</div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400">{{ m.count }} cuotas</div>
+                                <div class="text-sm font-bold num">{{ m.total | clp }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Últimas transacciones -->
+            <div class="card-padded">
+                <h3 class="text-base font-semibold mb-4">Últimas transacciones</h3>
+                {% if transactions %}
+                    <div class="space-y-2">
+                        {% for t in transactions %}
+                            <div class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                                <div class="min-w-0">
+                                    <div class="text-sm font-medium truncate">{{ t.description or '—' }}</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">{{ t.date | fecha }}
+                                        {% if t.category_name %} · {{ t.category_name }}{% endif %}
+                                    </div>
+                                </div>
+                                <div class="text-sm font-semibold num">{{ t.amount | clp }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-sm text-slate-400 text-center py-6">Sin movimientos con esta tarjeta</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

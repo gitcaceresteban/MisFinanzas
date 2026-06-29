@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% block title %}Ajustes{% endblock %}
+{% block page_title %}Ajustes{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-4xl">
+
+    <!-- Configuración general -->
+    <div class="card-padded">
+        <h3 class="text-lg font-semibold mb-4">Configuración general</h3>
+        <form method="POST" action="/ajustes/guardar" class="space-y-4">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="label">Tema por defecto</label>
+                    <select name="setting_theme" class="select">
+                        <option value="light" {% if settings.theme == 'light' %}selected{% endif %}>Claro</option>
+                        <option value="dark" {% if settings.theme == 'dark' %}selected{% endif %}>Oscuro</option>
+                        <option value="auto" {% if settings.theme == 'auto' or not settings.theme %}selected{% endif %}>Automático</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Moneda</label>
+                    <input type="text" name="setting_currency" class="input"
+                           value="{{ settings.currency or 'CLP' }}">
+                </div>
+                <div>
+                    <label class="label">Formato fecha</label>
+                    <input type="text" name="setting_date_format" class="input"
+                           value="{{ settings.date_format or 'dd/mm/yyyy' }}">
+                </div>
+                <div>
+                    <label class="label">Primer día del mes financiero</label>
+                    <input type="number" min="1" max="31" name="setting_first_day_of_month" class="input"
+                           value="{{ settings.first_day_of_month or 1 }}">
+                </div>
+                <div>
+                    <label class="label">Umbral saldo bajo (CLP)</label>
+                    <input type="number" step="0.01" name="setting_low_balance_threshold" class="input"
+                           value="{{ settings.low_balance_threshold or 50000 }}">
+                </div>
+                <div>
+                    <label class="label">Umbral cupo bajo (%)</label>
+                    <input type="number" min="1" max="100" name="setting_low_card_limit_pct" class="input"
+                           value="{{ settings.low_card_limit_pct or 20 }}">
+                </div>
+                <div>
+                    <label class="label">Aviso presupuesto al (%)</label>
+                    <input type="number" min="1" max="100" name="setting_budget_warn_pct" class="input"
+                           value="{{ settings.budget_warn_pct or 80 }}">
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button type="submit" class="btn-primary">
+                    <span class="leading-none">💾</span>
+                    Guardar configuración
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Categorías -->
+    <div class="card-padded">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Categorías</h3>
+            <button onclick="document.getElementById('new-cat').showModal()" class="btn-primary text-sm">
+                <i data-lucide="plus" class="w-4 h-4"></i> Nueva
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {% for c in categories %}
+                <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="emoji-chip emoji-chip-sm" style="background-color: {{ c.color }}20;">{{ c.icon | emoji }}</div>
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium truncate">{{ c.name }}</div>
+                            <div class="text-xs text-slate-500">{{ c.tx_count }} movimientos</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-0.5">
+                        <button type="button" onclick="document.getElementById('cat-{{ c.id }}').showModal()" class="icon-btn w-8 h-8" title="Editar">
+                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                        </button>
+                        <form action="/ajustes/categoria/{{ c.id }}/eliminar" method="POST" data-confirm="¿Desactivar categoría '{{ c.name }}'?">
+                            <button type="submit" class="icon-btn icon-btn-danger w-8 h-8" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Modal edit -->
+                <dialog id="cat-{{ c.id }}" class="rounded-2xl backdrop:bg-slate-900/60 p-0 max-w-md w-full bg-white dark:bg-slate-900">
+                    <form method="POST" action="/ajustes/categoria/{{ c.id }}/editar" class="p-6 space-y-4">
+                        <h4 class="font-bold">Editar categoría</h4>
+                        <div>
+                            <label class="label">Nombre</label>
+                            <input type="text" name="name" required class="input" value="{{ c.name }}">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="label">Color</label>
+                                <input type="color" name="color" class="h-11 w-full rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700" value="{{ c.color }}">
+                            </div>
+                            <div>
+                                <label class="label">Emoji</label>
+                                <input type="text" name="icon" class="input text-center text-lg" value="{{ c.icon | emoji }}" placeholder="🍔" maxlength="8">
+                            </div>
+                        </div>
+                        <input type="text" inputmode="numeric" name="monthly_budget" class="input money-input" value="{{ c.monthly_budget }}" placeholder="Presupuesto mensual (opcional)">
+                        <div class="flex gap-2">
+                            <button type="submit" class="btn-primary flex-1 justify-center">Guardar</button>
+                            <button type="button" class="btn-secondary" onclick="document.getElementById('cat-{{ c.id }}').close()">Cancelar</button>
+                        </div>
+                    </form>
+                </dialog>
+            {% endfor %}
+        </div>
+
+        <!-- Modal nueva categoría -->
+        <dialog id="new-cat" class="rounded-2xl backdrop:bg-slate-900/60 p-0 max-w-md w-full bg-white dark:bg-slate-900">
+            <form method="POST" action="/ajustes/categoria/nueva" class="p-6 space-y-4">
+                <h4 class="font-bold">Nueva categoría</h4>
+                <div>
+                    <label class="label">Nombre</label>
+                    <input type="text" name="name" required class="input" placeholder="Nombre de la categoría">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="label">Color</label>
+                        <input type="color" name="color" class="h-11 w-full rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700" value="#6366f1">
+                    </div>
+                    <div>
+                        <label class="label">Emoji</label>
+                        <input type="text" name="icon" class="input text-center text-lg" value="🏷️" placeholder="🍔" maxlength="8">
+                    </div>
+                </div>
+                <div>
+                    <label class="label">Presupuesto mensual <span class="text-slate-400 font-normal">(opcional)</span></label>
+                    <input type="text" inputmode="numeric" name="monthly_budget" class="input money-input" value="0" placeholder="0">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="btn-primary flex-1 justify-center">Crear</button>
+                    <button type="button" class="btn-secondary" onclick="document.getElementById('new-cat').close()">Cancelar</button>
+                </div>
+            </form>
+        </dialog>
+    </div>
+
+    <!-- Info técnica -->
+    <div class="card-padded text-sm text-slate-500 dark:text-slate-400">
+        <h3 class="text-lg font-semibold mb-3 text-slate-700 dark:text-slate-300">Acerca de</h3>
+        <ul class="space-y-1">
+            <li>• Versión: <strong>{{ app_version }}</strong></li>
+            <li>• Diseñado para uso personal en red local</li>
+            <li>• <strong class="text-amber-600 dark:text-amber-400">⚠ No exponer públicamente sin VPN (Tailscale recomendado)</strong></li>
+            <li>• Backup automático diario disponible vía script</li>
+            <li>• API disponible en <code>/api/</code> con token autenticación</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

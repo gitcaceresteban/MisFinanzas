@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+    <meta name="color-scheme" content="light dark">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+
+    <!-- Favicon emoji (sin archivos externos) -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E">
+
+    <!-- Estilos compilados (Tailwind) — 100%25 local, sin CDN -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+
+    <!-- Aplica el tema antes del render para evitar el "flash" de color -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('theme') || 'auto';
+                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (t === 'dark' || (t === 'auto' && prefersDark)) {
+                    document.documentElement.classList.add('dark');
+                }
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Alpine.js (vendorizado, offline) -->
+    <script defer src="{{ url_for('static', filename='js/vendor/alpine.min.js') }}"></script>
+</head>
+<body class="font-sans min-h-full">
+
+<div x-data="{ sidebar: false }"
+     @keydown.escape.window="sidebar = false"
+     @resize.window="if (window.innerWidth >= 1024) sidebar = false"
+     class="flex min-h-screen">
+
+    {% include 'partials/sidebar.html' %}
+
+    <!-- Contenido principal -->
+    <div class="flex-1 flex flex-col min-w-0 lg:ml-72">
+
+        {% include 'partials/topbar.html' %}
+
+        <!-- Mensajes flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="px-4 lg:px-8 pt-4 space-y-2">
+                    {% for category, msg in messages %}
+                        <div x-data="{ show: true }" x-show="show" x-transition
+                             class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium border shadow-soft
+                            {% if category == 'success' %}
+                                bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/20
+                            {% elif category == 'error' %}
+                                bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-500/20
+                            {% elif category == 'warning' %}
+                                bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/20
+                            {% else %}
+                                bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-500/20
+                            {% endif %}">
+                            <span class="text-base leading-none">
+                                {% if category == 'success' %}✅{% elif category == 'error' %}⛔{% elif category == 'warning' %}⚠️{% else %}ℹ️{% endif %}
+                            </span>
+                            <span class="flex-1">{{ msg }}</span>
+                            <button @click="show = false" class="opacity-60 hover:opacity-100 text-lg leading-none">&times;</button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <main class="flex-1 p-4 lg:p-8 animate-fade-in">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="px-4 lg:px-8 py-5 text-center text-xs text-slate-400 dark:text-slate-600">
+            <span>{{ app_name }} · v{{ app_version }}</span>
+            <span class="mx-2">·</span>
+            <span>🔒 Solo red local · No exponer sin VPN</span>
+        </footer>
+    </div>
+</div>
+
+<!-- Librerías vendorizadas (offline) -->
+<script src="{{ url_for('static', filename='js/vendor/lucide.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}"></script>
+
+<!-- Scripts de la app -->
+<script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+<script src="{{ url_for('static', filename='js/forms.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+<script>
+    // Inicializa iconos Lucide y los re-renderiza cuando Alpine actualiza el DOM
+    function renderIcons() { if (window.lucide) window.lucide.createIcons(); }
+    renderIcons();
+    document.addEventListener('alpine:initialized', renderIcons);
+</script>
+
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}Tarjetas{% endblock %}
+{% block page_title %}Tarjetas{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex items-center justify-between flex-wrap gap-4">
+        <div>
+            <h2 class="text-2xl font-bold">Tarjetas de crédito</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{ cards | length }} tarjeta(s)</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/tarjetas/calendario" class="btn-secondary">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+                <span>Calendario</span>
+            </a>
+            <a href="/tarjetas/nueva" class="btn-primary">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Nueva tarjeta</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Resumen -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="stat-card">
+            <div class="stat-label">Cupo total</div>
+            <div class="stat-value num">{{ total_limit | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Usado</div>
+            <div class="stat-value num text-rose-600 dark:text-rose-400">{{ total_used | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Disponible</div>
+            <div class="stat-value num text-emerald-600 dark:text-emerald-400">{{ total_available | clp }}</div>
+        </div>
+    </div>
+
+    {% if cards %}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {% for c in cards %}
+            {% set pct = ((c.used_amount or 0) / c.credit_limit * 100) if c.credit_limit else 0 %}
+            <div class="card overflow-hidden">
+                <div class="cc-visual p-5 h-44 flex flex-col justify-between"
+                     style="--bank-color: {{ c.bank_color or '#3b82f6' }};">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-xs opacity-75 uppercase tracking-wider">{{ c.bank_name or 'Tarjeta' }}</div>
+                            <div class="text-lg font-bold mt-1 drop-shadow">{{ c.name }}</div>
+                        </div>
+                        {% if c.bank_logo %}
+                            <img src="/bancos/logo/{{ c.bank_logo }}" alt="" class="w-11 h-11 rounded-xl bg-white object-contain p-1 shadow-md shrink-0">
+                        {% else %}
+                            <span class="text-2xl opacity-90">💳</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="text-xs opacity-75">Disponible</div>
+                        <div class="text-2xl font-bold num drop-shadow">{{ c.available_limit | clp }}</div>
+                    </div>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500 dark:text-slate-400">Usado</span>
+                        <span class="font-semibold num">{{ c.used_amount | clp }} / {{ c.credit_limit | clp }}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: {{ pct if pct <= 100 else 100 }}%; background-color: {{ c.bank_color or '#3b82f6' }};"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                        {% if c.billing_day %}<span>Factura día {{ c.billing_day }}</span>{% else %}<span>—</span>{% endif %}
+                        {% if c.payment_day %}<span>Paga día {{ c.payment_day }}</span>{% else %}<span>—</span>{% endif %}
+                    </div>
+
+                    {% if c.future_installments_amount and c.future_installments_amount > 0 %}
+                        <div class="text-xs text-violet-600 dark:text-violet-400 font-medium">
+                            <i data-lucide="layers" class="inline w-3.5 h-3.5"></i>
+                            Cuotas futuras: {{ c.future_installments_amount | clp }} ({{ c.pending_installments }} pendientes)
+                        </div>
+                    {% endif %}
+
+                    <div class="flex gap-2 pt-2">
+                        <a href="/tarjetas/{{ c.id }}" class="btn-secondary flex-1 justify-center text-xs">
+                            <i data-lucide="eye" class="w-3.5 h-3.5"></i> Ver
+                        </a>
+                        <a href="/tarjetas/{{ c.id }}/editar" class="btn-secondary px-3">
+                            <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                        </a>
+                        {% if c.status != 'cerrada' %}
+                        <form action="/tarjetas/{{ c.id }}/eliminar" method="POST" data-confirm="¿Cerrar la tarjeta '{{ c.name }}'?">
+                            <button type="submit" class="btn-secondary px-3">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-500"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        {% with icon='credit-card', title='Sin tarjetas aún', message='Registra tus tarjetas para llevar el control de cupo, cuotas y vencimientos.', action_url='/tarjetas/nueva', action_label='Agregar tarjeta' %}
+            {% include 'partials/empty_state.html' %}
+        {% endwith %}
+    {% endif %}
+
+</div>
+{% endblock %}

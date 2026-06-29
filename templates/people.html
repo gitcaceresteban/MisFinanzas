@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Personas{% endblock %}
+{% block page_title %}Personas{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold">Personas</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{ people | length }} persona(s)</p>
+        </div>
+        <a href="/personas/nueva" class="btn-primary">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Nueva persona</span>
+        </a>
+    </div>
+
+    <!-- Resumen global -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="stat-card">
+            <div class="stat-label">Me deben</div>
+            <div class="stat-value num text-emerald-600 dark:text-emerald-400">{{ total_they_owe | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Debo</div>
+            <div class="stat-value num text-rose-600 dark:text-rose-400">{{ total_i_owe | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Neto</div>
+            <div class="stat-value num">{{ (total_they_owe - total_i_owe) | clp }}</div>
+        </div>
+    </div>
+
+    {% if people %}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {% for p in people %}
+            <div class="card-padded">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold">
+                            {{ p.name[0] | upper }}
+                        </div>
+                        <div>
+                            <div class="font-semibold">{{ p.name }}</div>
+                            {% if p.alias %}<div class="text-xs text-slate-500 dark:text-slate-400">{{ p.alias }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-1.5 mb-4 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500 dark:text-slate-400">Me debe</span>
+                        <span class="font-semibold num text-emerald-600 dark:text-emerald-400">{{ p.they_owe | clp }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500 dark:text-slate-400">Le debo</span>
+                        <span class="font-semibold num text-rose-600 dark:text-rose-400">{{ p.i_owe | clp }}</span>
+                    </div>
+                    <div class="flex justify-between pt-1.5 border-t border-slate-100 dark:border-slate-800">
+                        <span class="text-slate-500 dark:text-slate-400">Neto</span>
+                        <span class="font-bold num {% if p.net > 0 %}text-emerald-600 dark:text-emerald-400{% elif p.net < 0 %}text-rose-600 dark:text-rose-400{% endif %}">
+                            {{ p.net | clp }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex gap-2">
+                    <a href="/personas/{{ p.id }}" class="btn-secondary flex-1 justify-center text-xs">
+                        <i data-lucide="eye" class="w-3.5 h-3.5"></i> Ver
+                    </a>
+                    <a href="/personas/{{ p.id }}/editar" class="btn-secondary px-3">
+                        <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                    </a>
+                    <form action="/personas/{{ p.id }}/eliminar" method="POST"
+                          data-confirm="¿Desactivar a '{{ p.name }}'?">
+                        <button type="submit" class="btn-secondary px-3">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-500"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        {% with icon='users', title='Sin personas', message='Agrega amigos, familiares o compañeros con quienes compartes gastos o deudas.', action_url='/personas/nueva', action_label='Agregar persona' %}
+            {% include 'partials/empty_state.html' %}
+        {% endwith %}
+    {% endif %}
+
+</div>
+{% endblock %}

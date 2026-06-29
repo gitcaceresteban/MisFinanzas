@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}{{ bill.name }}{% endblock %}
+{% block page_title %}{{ bill.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="mb-2">
+        <a href="/hogar/" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i> Volver
+        </a>
+    </div>
+
+    <!-- Info de la cuenta -->
+    <div class="card-padded">
+        <div class="flex justify-between items-start mb-4">
+            <div>
+                <h2 class="text-2xl font-bold">{{ bill.name }}</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    {% if bill.category_name %}{{ bill.category_name }} · {% endif %}
+                    {% if bill.due_date %}Vence {{ bill.due_date | fecha }}{% endif %}
+                </p>
+            </div>
+            <span class="badge badge-{{ bill.status | status_color }} capitalize">{{ bill.status }}</span>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+            <div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Total</div>
+                <div class="text-lg font-bold num">{{ bill.amount | clp }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Pagado por mí</div>
+                <div class="text-lg font-bold num text-emerald-600 dark:text-emerald-400">{{ bill.amount_paid_by_me | clp }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Cobrado a otros</div>
+                <div class="text-lg font-bold num">{{ bill.amount_collected | clp }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Por cobrar</div>
+                <div class="text-lg font-bold num text-rose-600 dark:text-rose-400">{{ bill.pending_to_collect | clp }}</div>
+            </div>
+        </div>
+
+        <div class="flex gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            {% if bill.status != 'pagada' %}
+                <form action="/hogar/{{ bill.id }}/marcar-pagada" method="POST">
+                    <button type="submit" class="btn-primary">
+                        <i data-lucide="check" class="w-4 h-4"></i> Marcar pagada
+                    </button>
+                </form>
+            {% endif %}
+            <a href="/hogar/{{ bill.id }}/editar" class="btn-secondary">
+                <i data-lucide="edit-2" class="w-4 h-4"></i> Editar
+            </a>
+        </div>
+    </div>
+
+    <!-- Participantes -->
+    <div class="card-padded">
+        <h3 class="text-base font-semibold mb-4">Participantes ({{ participants | length }})</h3>
+        {% if participants %}
+            <div class="space-y-3">
+                {% for p in participants %}
+                    <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-bold">
+                                    {{ p.person_name[0] | upper }}
+                                </div>
+                                <div>
+                                    <div class="font-medium">{{ p.person_name }}</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                                        Le toca: <span class="font-bold num">{{ p.share_amount | clp }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm">Pagó: <span class="font-bold num">{{ p.paid_amount | clp }}</span></div>
+                                <span class="badge badge-{{ p.status | status_color }} capitalize">{{ p.status }}</span>
+                            </div>
+                        </div>
+
+                        {% if p.status != 'pagado' %}
+                            <details class="mt-3 text-sm">
+                                <summary class="cursor-pointer text-primary-600 dark:text-primary-400 hover:underline font-medium">💰 Me pagó / registrar abono</summary>
+                                <form method="POST" action="/hogar/participante/{{ p.id }}/abonar" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2"
+                                      data-confirm="¿Registrar este abono? Si eliges una cuenta, se sumará a tu saldo.">
+                                    <input type="text" inputmode="numeric" name="amount" required class="input money-input" placeholder="Monto que pagó">
+                                    <input type="date" name="date" class="input" value="{{ today }}">
+                                    <select name="account_id" class="select md:col-span-2">
+                                        <option value="">💵 ¿Depositar en una cuenta? (opcional)</option>
+                                        {% for a in accounts %}
+                                            <option value="{{ a.id }}">Sumar a {{ a.name }}{% if a.bank_name %} · {{ a.bank_name }}{% endif %} ({{ a.balance | clp }})</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn-primary justify-center md:col-span-2">✅ Registrar abono</button>
+                                </form>
+                            </details>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-sm text-slate-400 text-center py-6">Sin participantes</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

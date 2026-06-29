@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}{{ loan.name }}{% endblock %}
+{% block page_title %}{{ loan.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="mb-2">
+        <a href="/creditos/" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i> Volver
+        </a>
+    </div>
+
+    <!-- Info principal -->
+    <div class="card-padded">
+        <div class="flex justify-between items-start flex-wrap gap-4">
+            <div class="flex items-start gap-3">
+                {% if loan.bank_logo %}
+                    <img src="/bancos/logo/{{ loan.bank_logo }}" alt="" class="bank-logo-sm">
+                {% else %}
+                    <div class="bank-logo-sm grid place-items-center text-lg" style="background: {{ loan.bank_color or '#8b5cf6' }}1a;">🏦</div>
+                {% endif %}
+                <div>
+                    <div class="flex items-center gap-2 mb-2 flex-wrap">
+                        <span class="badge badge-purple">{{ loan.type | loan_type }}</span>
+                        <span class="badge badge-{{ loan.status | status_color }} capitalize">{{ loan.status }}</span>
+                    </div>
+                    <h2 class="text-2xl font-bold">{{ loan.name }}</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        {{ loan.bank_name or loan.entity or '—' }}{% if loan.billed_in_card and loan.card_name %} · se factura en {{ loan.card_name }}{% endif %}
+                    </p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                {% if loan.status == 'vigente' and next_inst %}
+                <a href="/creditos/{{ loan.id }}/pagar" class="btn-primary">💸 Pagar cuota</a>
+                {% endif %}
+                <a href="/creditos/{{ loan.id }}/editar" class="btn-secondary">✏️ Editar</a>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+            <div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Original</div>
+                <div class="text-lg font-bold num">{{ loan.original_amount | clp }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Pendiente</div>
+                <div class="text-lg font-bold num text-rose-600 dark:text-rose-400">{{ loan.pending_amount | clp }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Cuota</div>
+                <div class="text-lg font-bold num">{{ loan.installment_amount | clp }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Avance</div>
+                <div class="text-lg font-bold num">{{ pct }}%</div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <div class="progress-bar">
+                <div class="progress-bar-fill bg-emerald-500" style="width: {{ pct }}%;"></div>
+            </div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 text-center">
+                {{ loan.paid_installments }} de {{ loan.total_installments }} cuotas pagadas
+            </div>
+        </div>
+    </div>
+
+    <!-- Cuotas -->
+    <div class="card-padded">
+        <h3 class="text-base font-semibold mb-4">Calendario de cuotas</h3>
+        {% if installments %}
+            <div class="overflow-x-auto -mx-5">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Vencimiento</th>
+                            <th>Estado</th>
+                            <th class="text-right">Monto</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for i in installments %}
+                            <tr>
+                                <td class="text-sm">{{ i.installment_number }}</td>
+                                <td class="text-sm">{{ i.due_date | fecha }}</td>
+                                <td><span class="badge badge-{{ i.status | status_color }} capitalize">{{ i.status }}</span></td>
+                                <td class="text-right font-semibold num">{{ i.amount | clp }}</td>
+                                <td class="text-right">
+                                    {% if i.status == 'pendiente' %}
+                                        <form action="/creditos/cuota/{{ i.id }}/pagar" method="POST" data-confirm="¿Marcar esta cuota como pagada?">
+                                            <button type="submit" class="btn-ghost text-xs">
+                                                <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i> Pagar
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <span class="text-xs text-slate-400">{{ i.paid_date | fecha if i.paid_date else '' }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-sm text-slate-400 text-center py-6">Sin cuotas generadas</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

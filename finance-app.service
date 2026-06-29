@@ -1,0 +1,14 @@
+[Unit]
+Description=Motor Financiero Personal
+After=network.target
+
+[Service]
+User=caceresteban
+WorkingDirectory=/home/caceresteban/Aplicaciones/motor-financiero
+Environment="PATH=/home/caceresteban/Aplicaciones/motor-financiero/venv/bin"
+ExecStart=/home/caceresteban/Aplicaciones/motor-financiero/venv/bin/python /home/caceresteban/Aplicaciones/motor-financiero/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

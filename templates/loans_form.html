@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}{% if loan %}Editar{% else %}Nuevo{% endif %} crédito{% endblock %}
+{% block page_title %}{% if loan %}Editar{% else %}Nuevo{% endif %} crédito{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+    <div class="mb-6">
+        <a href="/creditos/" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <span>←</span> Volver
+        </a>
+    </div>
+
+    <form method="POST" class="card-padded space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Nombre del crédito *</label>
+                <input type="text" name="name" required class="input"
+                       value="{{ loan.name if loan else '' }}"
+                       placeholder="Ej: Crédito de consumo, Avance CMR">
+            </div>
+            <div>
+                <label class="label">Tipo</label>
+                <select name="type" class="select">
+                    {% for v, l in types %}
+                        <option value="{{ v }}" {% if loan and loan.type == v %}selected{% endif %}>{{ l }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Banco</label>
+                <select name="bank_id" class="select">
+                    <option value="">— Sin banco —</option>
+                    {% for b in banks %}
+                        <option value="{{ b.id }}" {% if loan and loan.bank_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label">Entidad (texto libre)</label>
+                <input type="text" name="entity" class="input"
+                       value="{{ loan.entity if loan else '' }}" placeholder="Opcional">
+            </div>
+        </div>
+
+        <!-- Vínculo con tarjeta (ej. Avance / SAV que se facturan en la CMR) -->
+        <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <label class="inline-flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input type="checkbox" name="billed_in_card" id="billed_in_card" class="w-4 h-4 rounded"
+                       {% if loan and loan.billed_in_card %}checked{% endif %}
+                       onchange="document.getElementById('card_link').classList.toggle('hidden', !this.checked)">
+                💳 Este crédito se factura dentro de una tarjeta (avance, SAV, etc.)
+            </label>
+            <div id="card_link" class="{% if not (loan and loan.billed_in_card) %}hidden{% endif %}">
+                <label class="label">Tarjeta donde se factura</label>
+                <select name="card_id" class="select">
+                    <option value="">— Selecciona tarjeta —</option>
+                    {% for c in cards %}
+                        <option value="{{ c.id }}" {% if loan and loan.card_id == c.id %}selected{% endif %}>{{ c.name }}{% if c.bank_name %} · {{ c.bank_name }}{% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Monto solicitado *</label>
+                <input type="text" inputmode="numeric" name="original_amount" required class="input money-input"
+                       value="{{ loan.original_amount if loan else '' }}" placeholder="0">
+                <p class="hint">Lo que pediste originalmente.</p>
+            </div>
+            <div>
+                <label class="label">Monto pendiente</label>
+                <input type="text" inputmode="numeric" name="pending_amount" class="input money-input"
+                       value="{{ loan.pending_amount if loan else '' }}" placeholder="Se calcula solo">
+                <p class="hint">Si lo dejas vacío = valor cuota × cuotas pendientes.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="label">Total de cuotas *</label>
+                <input type="number" name="total_installments" required class="input"
+                       value="{{ loan.total_installments if loan else '' }}" placeholder="36">
+            </div>
+            <div>
+                <label class="label">Cuotas pagadas</label>
+                <input type="number" name="paid_installments" class="input"
+                       value="{{ loan.paid_installments if loan else 0 }}" placeholder="0">
+            </div>
+            <div>
+                <label class="label">Valor de la cuota</label>
+                <input type="text" inputmode="numeric" name="installment_amount" class="input money-input"
+                       value="{{ loan.installment_amount if loan else '' }}" placeholder="0">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="label">Día de pago mensual</label>
+                <input type="number" min="1" max="31" name="payment_day" class="input"
+                       value="{{ loan.payment_day if loan else '' }}" placeholder="Ej: 15">
+            </div>
+            <div>
+                <label class="label">Fecha 1ª cuota</label>
+                <input type="date" name="first_payment_date" class="input"
+                       value="{{ loan.first_payment_date if loan else today }}">
+            </div>
+            <div>
+                <label class="label">Tasa interés (%)</label>
+                <input type="number" step="0.01" name="interest_rate" class="input"
+                       value="{{ loan.interest_rate if loan else '' }}" placeholder="Opcional">
+            </div>
+        </div>
+
+        <div>
+            <label class="label">Estado</label>
+            <select name="status" class="select">
+                {% for v, l in statuses %}
+                    <option value="{{ v }}" {% if loan and loan.status == v %}selected{% endif %}>{{ l }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="flex items-center gap-3 p-3 rounded-lg bg-primary-50 dark:bg-primary-950/30 border border-primary-200 dark:border-primary-900">
+            <input type="checkbox" name="generate_installments" id="generate_installments" {% if not loan %}checked{% endif %} class="w-4 h-4 rounded">
+            <label for="generate_installments" class="text-sm">Generar / regenerar el calendario de cuotas automáticamente</label>
+        </div>
+
+        <div>
+            <label class="label">Notas</label>
+            <textarea name="notes" class="textarea" rows="3" placeholder="Ej: avance que se cobra en la facturación de la CMR">{{ loan.notes if loan else '' }}</textarea>
+        </div>
+
+        <div class="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button type="submit" class="btn-primary">
+                ✅ <span>{{ 'Guardar cambios' if loan else 'Crear crédito' }}</span>
+            </button>
+            <a href="/creditos/" class="btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

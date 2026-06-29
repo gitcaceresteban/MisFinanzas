@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}{% if card %}Editar{% else %}Nueva{% endif %} tarjeta{% endblock %}
+{% block page_title %}{% if card %}Editar{% else %}Nueva{% endif %} tarjeta{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+    <div class="mb-6">
+        <a href="/tarjetas/" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i> Volver
+        </a>
+    </div>
+
+    <form method="POST" class="card-padded space-y-5">
+        <div>
+            <label class="label">Nombre</label>
+            <input type="text" name="name" required class="input"
+                   value="{{ card.name if card else '' }}"
+                   placeholder="Ej: Visa Falabella">
+        </div>
+
+        <div>
+            <label class="label">Banco</label>
+            <select name="bank_id" class="select">
+                <option value="">— Sin banco —</option>
+                {% for b in banks %}
+                    <option value="{{ b.id }}" {% if card and card.bank_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Cupo total</label>
+                <input type="text" inputmode="numeric" name="credit_limit" class="input money-input"
+                       value="{{ card.credit_limit if card else 0 }}" placeholder="0">
+            </div>
+            <div>
+                <label class="label">Cupo usado actual</label>
+                <input type="text" inputmode="numeric" name="used_amount" class="input money-input"
+                       value="{{ card.used_amount if card else 0 }}" placeholder="0">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Día de facturación</label>
+                <input type="number" min="1" max="31" name="billing_day" class="input"
+                       value="{{ card.billing_day if card else '' }}" placeholder="15">
+            </div>
+            <div>
+                <label class="label">Día de pago</label>
+                <input type="number" min="1" max="31" name="payment_day" class="input"
+                       value="{{ card.payment_day if card else '' }}" placeholder="5">
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+            <input type="checkbox" name="has_billed_debt" id="has_billed_debt"
+                   {% if card and card.has_billed_debt %}checked{% endif %}
+                   class="w-4 h-4 rounded">
+            <label for="has_billed_debt" class="text-sm">Tiene deuda facturada por pagar</label>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Monto facturado</label>
+                <input type="text" inputmode="numeric" name="billed_amount" class="input money-input"
+                       value="{{ card.billed_amount if card else 0 }}" placeholder="0">
+            </div>
+            <div>
+                <label class="label">Monto no facturado</label>
+                <input type="text" inputmode="numeric" name="unbilled_amount" class="input money-input"
+                       value="{{ card.unbilled_amount if card else 0 }}" placeholder="0">
+            </div>
+        </div>
+
+        <div>
+            <label class="label">Estado</label>
+            <select name="status" class="select">
+                {% for v, l in statuses %}
+                    <option value="{{ v }}" {% if card and card.status == v %}selected{% endif %}>{{ l }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="label">Notas</label>
+            <textarea name="notes" class="textarea" rows="3">{{ card.notes if card else '' }}</textarea>
+        </div>
+
+        <div class="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button type="submit" class="btn-primary">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>{{ 'Guardar' if card else 'Crear tarjeta' }}</span>
+            </button>
+            <a href="/tarjetas/" class="btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
