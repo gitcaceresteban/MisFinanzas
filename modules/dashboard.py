@@ -132,6 +132,15 @@ def index():
     total_cards_available = total_cards_limit - total_cards_used
     total_future_installments = sum(c["future_installments_amount"] or 0 for c in cards)
 
+    # Datos para el filtro de "cupo disponible" por tarjeta (se serializa como
+    # JSON dentro de un <script>, no en un atributo, para evitar romper el HTML).
+    cards_json = [{
+        "id": c["id"], "name": c["name"],
+        "available": (c["credit_limit"] or 0) - (c["used_amount"] or 0),
+        "used": c["used_amount"] or 0,
+        "limit": c["credit_limit"] or 0,
+    } for c in cards]
+
     # ----- Gastos del mes -----
     month_expenses = db.query("""
         SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
@@ -353,6 +362,7 @@ def index():
         year=year, month=month,
         accounts=accounts,
         cards=cards,
+        cards_json=cards_json,
         debt=debt,
         total_debt=debt["total"],
         monthly_income=monthly_income,

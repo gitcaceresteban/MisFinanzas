@@ -13,6 +13,7 @@
     <form method="POST" enctype="multipart/form-data" class="card-padded space-y-5"
           x-data="{
               split: '{{ bill.split_type if bill else 'equal' }}',
+              recurring: {{ 'true' if (bill and bill.is_recurring) else 'false' }},
               participants: [
                 {% for p in participants %}{ person_id: '{{ p.person_id }}', share: '{{ p.share_percent if (bill and bill.split_type == 'percent') else (p.share_amount | int) }}' }{{ ',' if not loop.last }}{% endfor %}
               ]
@@ -74,9 +75,18 @@
             </div>
         </div>
 
+        <!-- Cuenta fija mensual (Agua, Luz, Tricot, TAG, ...) -->
+        <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+            <label class="inline-flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input type="checkbox" name="is_recurring" x-model="recurring" class="w-4 h-4 rounded">
+                🔁 Cuenta fija mensual
+            </label>
+            <p class="hint">Si la marcas, al pagarla se crea automáticamente la del mes siguiente (conservando el historial). Ideal para Agua, Luz, Tricot, TAG…</p>
+        </div>
+
         {% if not bill %}
-        <!-- Cuotas: me lo pagan en N meses -->
-        <div class="p-4 rounded-xl bg-primary-50 dark:bg-primary-500/10 border border-primary-200 dark:border-primary-500/20">
+        <!-- Cuotas: me lo pagan en N meses (solo para compras puntuales) -->
+        <div class="p-4 rounded-xl bg-primary-50 dark:bg-primary-500/10 border border-primary-200 dark:border-primary-500/20" x-show="!recurring" x-cloak>
             <label class="label">¿Te lo pagan en cuotas?</label>
             <div class="flex items-center gap-3">
                 <input type="number" min="1" max="48" name="installments_total" value="1"

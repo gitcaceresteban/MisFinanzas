@@ -16,7 +16,7 @@ Aplicación web completa para gestionar tus finanzas personales, pensada para co
 
 ## ✨ Características
 
-- 📊 **Dashboard** con KPIs, **“disponible para gastar este mes”**, gráfico de gastos y evolución de 6 meses; el **cupo disponible** se puede filtrar por tarjeta y hay una tarjeta de **deuda total** (tarjetas + créditos) con **tendencia de endeudamiento** (histórico real + proyección de cómo debería ir bajando)
+- 📊 **Dashboard** con KPIs, **“disponible para gastar este mes”**, gráfico de gastos y evolución de 6 meses; el **cupo disponible** se filtra por tarjeta (muestra disponible **y utilizado**, o la suma de todas) y hay una tarjeta de **deuda total** (tarjetas + créditos) con **tendencia de endeudamiento** (histórico real + proyección de cómo debería ir bajando)
 - 🧮 **Plan & escenarios** — ingresa tu sueldo y mira cuánto puedes gastar; **simulador** de compras en cuotas que proyecta los próximos 12 meses con **veredicto por colchón**: ✅ alcanza (≥ $300.000), ⚠️ muy ajustado (entre $0 y $300.000) o ⛔ no alcanza (< $0)
 - 🏦 **Bancos, cuentas y tarjetas** — 11 bancos chilenos **precargados** con sus colores; ahora puedes **subir el logo** de cada banco y se ve en tarjetas y créditos
 - 💳 **Tarjetas de crédito** con cupos, días de pago, facturación y cuotas
@@ -24,7 +24,7 @@ Aplicación web completa para gestionar tus finanzas personales, pensada para co
 - 💸 **Gastos e ingresos** con categorías, adjuntos, filtros y exportación CSV
 - 🤝 **Gastos compartidos** — al crear un gasto puedes repartirlo entre personas (genera **cuentas por cobrar**) o mandarlo a **Cuentas del Hogar**; al marcar que te pagaron, el monto se **suma a tu cuenta**
 - 👥 **Personas y deudas** entre amigos/familia, con abonos parciales
-- 🏠 **Cuentas del hogar** compartidas (equitativa, fija, porcentual o personalizada), **con logo**, **separadas por mes** (cargos / abonado / neto por cobrar), **compras en cuotas** que generan un cargo en el mes actual y los siguientes, y **registro de abonos** con historial para ver cuánto falta por cobrar
+- 🏠 **Cuentas del hogar** con **filtro por mes/año**, **con logo** y **cuentas fijas mensuales** (Agua, Luz, Tricot, TAG…): al marcarlas pagadas se **crea automáticamente la del mes siguiente** conservando el historial. Resumen por mes (facturado / por cobrar / abonado / neto), **abonos por mes** (pagos parciales de a poco), división entre participantes y **compras en cuotas**
 - 🔁 **Pagos recurrentes** con **logo del proveedor** y opción “me lo devuelven” (cuentas de terceros que pagas tú)
 - 🎯 **Presupuestos** por categoría/cuenta/persona/total
 - 💯 **Montos con autoformato** — escribes `1234567` y se muestra `1.234.567` al instante

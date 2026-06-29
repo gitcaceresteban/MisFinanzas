@@ -32,18 +32,13 @@
             <div class="stat-sub">{{ accounts | length }} cuenta(s)</div>
         </a>
 
-        <div class="stat-card" x-data="cupoFilter({
-                all: { available: {{ total_cards_available or 0 }}, limit: {{ total_cards_limit or 0 }} },
-                cards: [
-                    {% for c in cards %}{ id: {{ c.id }}, name: {{ c.name | tojson }}, available: {{ c.available_limit or 0 }}, limit: {{ c.credit_limit or 0 }} }{{ ',' if not loop.last }}{% endfor %}
-                ]
-             })">
+        <div class="stat-card" x-data="cupoFilter()">
             <div class="flex items-start justify-between mb-2">
                 <div class="stat-label">Cupo disponible</div>
                 <div class="stat-icon bg-blue-100 dark:bg-blue-500/15">💳</div>
             </div>
-            <div class="stat-value" x-text="fmt(current.available)">{{ total_cards_available | clp }}</div>
-            <div class="stat-sub">de <span x-text="fmt(current.limit)">{{ total_cards_limit | clp }}</span></div>
+            <div class="stat-value" x-text="fmt(cur.available)">{{ total_cards_available | clp }}</div>
+            <div class="stat-sub">Utilizado <span class="num" x-text="fmt(cur.used)">{{ total_cards_used | clp }}</span> · de <span class="num" x-text="fmt(cur.limit)">{{ total_cards_limit | clp }}</span></div>
             {% if cards %}
             <select x-model="sel" class="select mt-2 text-xs py-1.5">
                 <option value="all">Todas las tarjetas</option>
@@ -466,15 +461,17 @@
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script>
     // Filtro de cupo disponible por tarjeta (card del dashboard)
-    function cupoFilter(data) {
+    window.__cupoCards = {{ cards_json | tojson }};
+    window.__cupoAll = { available: {{ total_cards_available or 0 }}, used: {{ total_cards_used or 0 }}, limit: {{ total_cards_limit or 0 }} };
+    function cupoFilter() {
         return {
-            all: data.all,
-            cards: data.cards || [],
+            all: window.__cupoAll,
+            cards: window.__cupoCards || [],
             sel: 'all',
-            get current() {
+            get cur() {
                 if (this.sel === 'all') return this.all;
                 const c = this.cards.find(x => String(x.id) === String(this.sel));
-                return c ? { available: c.available, limit: c.limit } : this.all;
+                return c ? { available: c.available, used: c.used, limit: c.limit } : this.all;
             },
             fmt(n) { return window.fmtCLP ? window.fmtCLP(n) : n; }
         };
