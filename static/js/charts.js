@@ -110,6 +110,57 @@ window.makeEvolutionChart = function(canvasId, data) {
 };
 
 /**
+ * Crea gráfico de tendencia de endeudamiento (histórico real + proyección).
+ */
+window.makeDebtTrendChart = function(canvasId, payload) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return null;
+
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: payload.labels,
+            datasets: [
+                {
+                    label: 'Deuda real',
+                    data: payload.real,
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                    fill: true,
+                    tension: 0.2,
+                    spanGaps: false,
+                    pointRadius: 3,
+                },
+                {
+                    label: 'Proyección',
+                    data: payload.projected,
+                    borderColor: '#10b981',
+                    borderDash: [6, 4],
+                    backgroundColor: 'rgba(16, 185, 129, 0.06)',
+                    fill: false,
+                    tension: 0.2,
+                    spanGaps: true,
+                    pointRadius: 0,
+                }
+            ]
+        },
+        options: {
+            ...window.chartDefaults,
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            scales: {
+                x: { ticks: { color: textColor(), maxTicksLimit: 12 }, grid: { display: false } },
+                y: {
+                    ticks: { color: textColor(), callback: (v) => window.fmtCLP(v) },
+                    grid: { color: gridColor() }
+                }
+            }
+        }
+    });
+};
+
+/**
  * Crea gráfico de flujo de caja proyectado.
  */
 window.makeCashflowChart = function(canvasId, data) {

@@ -8,7 +8,7 @@
     <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
             <h2 class="text-2xl font-bold">Cuentas del hogar</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Gastos compartidos y división con personas</p>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Gastos compartidos, cuotas y abonos · separado por mes</p>
         </div>
         <a href="/hogar/nueva" class="btn-primary">
             <i data-lucide="plus" class="w-4 h-4"></i>
@@ -27,7 +27,7 @@
             <div class="stat-value num text-rose-600 dark:text-rose-400">{{ total_pending_amount | clp }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Por cobrar</div>
+            <div class="stat-label">Neto por cobrar</div>
             <div class="stat-value num text-emerald-600 dark:text-emerald-400">{{ total_to_collect | clp }}</div>
         </div>
         <div class="stat-card">
@@ -36,37 +36,64 @@
         </div>
     </div>
 
-    {% if bills %}
-    <div class="card overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Cuenta</th>
-                        <th>Categoría</th>
-                        <th>Participantes</th>
-                        <th>Estado</th>
-                        <th class="text-right">Monto</th>
-                        <th class="text-right">Pendiente</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for b in bills %}
+    {% if grouped %}
+        {% for g in grouped %}
+        <div class="card overflow-hidden">
+            <!-- Cabecera del mes -->
+            <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3
+                        {% if g.key == current_ym %}bg-primary-50/60 dark:bg-primary-500/10{% endif %}">
+                <h3 class="text-base font-bold flex items-center gap-2">
+                    <span>📅</span> {{ g.label }}
+                    {% if g.key == current_ym %}<span class="badge badge-blue">Este mes</span>{% endif %}
+                </h3>
+                <div class="flex flex-wrap items-center gap-4 text-xs">
+                    <span class="text-slate-500 dark:text-slate-400">Cargos <span class="num font-semibold text-slate-700 dark:text-slate-200">{{ g.cargos | clp }}</span></span>
+                    <span class="text-slate-500 dark:text-slate-400">Por cobrar <span class="num font-semibold">{{ g.por_cobrar | clp }}</span></span>
+                    <span class="text-slate-500 dark:text-slate-400">Abonado <span class="num font-semibold text-emerald-600 dark:text-emerald-400">{{ g.abonado | clp }}</span></span>
+                    <span class="text-slate-500 dark:text-slate-400">Neto <span class="num font-bold {% if g.neto > 0 %}text-rose-600 dark:text-rose-400{% else %}text-emerald-600 dark:text-emerald-400{% endif %}">{{ g.neto | clp }}</span></span>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td class="text-xs text-slate-500 whitespace-nowrap">{{ b.due_date | fecha if b.due_date else '—' }}</td>
-                            <td class="font-medium">{{ b.name }}</td>
+                            <th>Cuenta</th>
+                            <th>Categoría</th>
+                            <th>Estado</th>
+                            <th class="text-right">Monto</th>
+                            <th class="text-right">Abonado</th>
+                            <th class="text-right">Falta cobrar</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in g.bills %}
+                        <tr>
+                            <td>
+                                <div class="flex items-center gap-3">
+                                    {% if b.logo_path %}
+                                        <img src="/hogar/logo/{{ b.logo_path }}" alt="" class="bank-logo-sm">
+                                    {% else %}
+                                        <div class="bank-logo-sm grid place-items-center text-base">{{ b.category_icon | emoji('🏠') }}</div>
+                                    {% endif %}
+                                    <div class="min-w-0">
+                                        <div class="font-medium truncate">{{ b.name }}</div>
+                                        <div class="text-xs text-slate-400">
+                                            {% if b.due_date %}{{ b.due_date | fecha }}{% endif %}
+                                            {% if b.installments_total and b.installments_total > 1 %}· cuota {{ b.installment_number }}/{{ b.installments_total }}{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
                             <td><span class="text-xs">{{ b.category_name or '—' }}</span></td>
-                            <td class="text-xs">{{ b.participants_count }}</td>
                             <td><span class="badge badge-{{ b.status | status_color }} capitalize">{{ b.status }}</span></td>
                             <td class="text-right font-semibold num">{{ b.amount | clp }}</td>
-                            <td class="text-right font-medium num {% if b.pending_to_collect > 0 %}text-rose-600 dark:text-rose-400{% endif %}">
-                                {{ b.pending_to_collect | clp }}
-                            </td>
+                            <td class="text-right num text-emerald-600 dark:text-emerald-400">{{ b.abonado | clp }}</td>
+                            <td class="text-right font-medium num {% if b.pendiente > 0 %}text-rose-600 dark:text-rose-400{% endif %}">{{ b.pendiente | clp }}</td>
                             <td class="text-right">
                                 <div class="flex justify-end gap-1">
-                                    <a href="/hogar/{{ b.id }}" class="btn-ghost p-1.5" title="Ver"><i data-lucide="eye" class="w-3.5 h-3.5"></i></a>
+                                    <a href="/hogar/{{ b.id }}" class="btn-ghost p-1.5" title="Ver / abonar"><i data-lucide="eye" class="w-3.5 h-3.5"></i></a>
                                     {% if b.status != 'pagada' %}
                                     <form action="/hogar/{{ b.id }}/marcar-pagada" method="POST">
                                         <button type="submit" class="btn-ghost p-1.5" title="Marcar pagada"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i></button>
@@ -79,11 +106,12 @@
                                 </div>
                             </td>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
+        {% endfor %}
     {% else %}
         {% with icon='home', title='Sin cuentas del hogar', message='Aquí van los gastos compartidos: arriendo, servicios, comida común... y se divide entre los participantes.', action_url='/hogar/nueva', action_label='Crear primera' %}
             {% include 'partials/empty_state.html' %}

@@ -32,14 +32,27 @@
             <div class="stat-sub">{{ accounts | length }} cuenta(s)</div>
         </a>
 
-        <a href="/tarjetas/" class="stat-card card-hover">
+        <div class="stat-card" x-data="cupoFilter({
+                all: { available: {{ total_cards_available or 0 }}, limit: {{ total_cards_limit or 0 }} },
+                cards: [
+                    {% for c in cards %}{ id: {{ c.id }}, name: {{ c.name | tojson }}, available: {{ c.available_limit or 0 }}, limit: {{ c.credit_limit or 0 }} }{{ ',' if not loop.last }}{% endfor %}
+                ]
+             })">
             <div class="flex items-start justify-between mb-2">
                 <div class="stat-label">Cupo disponible</div>
                 <div class="stat-icon bg-blue-100 dark:bg-blue-500/15">💳</div>
             </div>
-            <div class="stat-value">{{ total_cards_available | clp }}</div>
-            <div class="stat-sub">de {{ total_cards_limit | clp }}</div>
-        </a>
+            <div class="stat-value" x-text="fmt(current.available)">{{ total_cards_available | clp }}</div>
+            <div class="stat-sub">de <span x-text="fmt(current.limit)">{{ total_cards_limit | clp }}</span></div>
+            {% if cards %}
+            <select x-model="sel" class="select mt-2 text-xs py-1.5">
+                <option value="all">Todas las tarjetas</option>
+                <template x-for="c in cards" :key="c.id">
+                    <option :value="c.id" x-text="c.name"></option>
+                </template>
+            </select>
+            {% endif %}
+        </div>
 
         <a href="/gastos/" class="stat-card card-hover">
             <div class="flex items-start justify-between mb-2">
@@ -79,6 +92,55 @@
             <div class="flex flex-col items-end gap-2">
                 <span class="text-5xl opacity-30">💸</span>
                 <a href="/plan/" class="text-xs font-semibold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition">Ver plan & simular →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Endeudamiento total y tendencia -->
+    <div class="card-padded">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="section-title">📉 Endeudamiento total</h3>
+            <a href="/creditos/" class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Ver créditos</a>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div>
+                <div class="stat-label">Deuda total (tarjetas + créditos)</div>
+                <div class="text-3xl font-bold num mt-1">{{ total_debt | clp }}</div>
+                <div class="mt-2 flex items-center gap-2 flex-wrap">
+                    {% if debt.direction == 'down' %}
+                        <span class="badge badge-green">▼ A la baja</span>
+                    {% elif debt.direction == 'up' %}
+                        <span class="badge badge-red">▲ Al alza</span>
+                    {% else %}
+                        <span class="badge badge-gray">≈ Estable</span>
+                    {% endif %}
+                    {% if debt.delta_prev is not none %}
+                        <span class="text-xs text-slate-500 dark:text-slate-400 num">{{ debt.delta_prev | clp }} vs mes anterior</span>
+                    {% endif %}
+                </div>
+                <div class="mt-4 space-y-1.5 text-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500 dark:text-slate-400">💳 Tarjetas</span>
+                        <span class="font-semibold num">{{ debt.cards_debt | clp }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500 dark:text-slate-400">📉 Créditos</span>
+                        <span class="font-semibold num">{{ debt.loans_debt | clp }}</span>
+                    </div>
+                </div>
+                {% if debt.proj_drop > 0 %}
+                <div class="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-xs text-emerald-800 dark:text-emerald-300">
+                    💡 Si mantienes los pagos al día, en <span class="font-semibold">{{ debt.proj_end_label }}</span>
+                    tu deuda bajaría a ~<span class="font-bold num">{{ debt.proj_end | clp }}</span>
+                    (<span class="num">-{{ debt.proj_drop | clp }}</span>).
+                </div>
+                {% endif %}
+            </div>
+            <div class="lg:col-span-2">
+                <div class="h-56">
+                    <canvas id="debtChart"></canvas>
+                </div>
+                <p class="text-xs text-slate-400 text-center mt-2">Línea sólida: histórico real · línea punteada: proyección según tus cuotas</p>
             </div>
         </div>
     </div>
@@ -403,6 +465,21 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script>
+    // Filtro de cupo disponible por tarjeta (card del dashboard)
+    function cupoFilter(data) {
+        return {
+            all: data.all,
+            cards: data.cards || [],
+            sel: 'all',
+            get current() {
+                if (this.sel === 'all') return this.all;
+                const c = this.cards.find(x => String(x.id) === String(this.sel));
+                return c ? { available: c.available, limit: c.limit } : this.all;
+            },
+            fmt(n) { return window.fmtCLP ? window.fmtCLP(n) : n; }
+        };
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         {% if expenses_by_category %}
         window.makeCategoryChart('categoryChart', {{ expenses_by_category | tojson }});
@@ -410,6 +487,9 @@
         {% if monthly_evolution %}
         window.makeEvolutionChart('evolutionChart', {{ monthly_evolution | tojson }});
         {% endif %}
+        if (window.makeDebtTrendChart) {
+            window.makeDebtTrendChart('debtChart', {{ {"labels": debt.labels, "real": debt.real, "projected": debt.projected} | tojson }});
+        }
     });
 </script>
 {% endblock %}

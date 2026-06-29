@@ -62,6 +62,12 @@ MIGRATIONS = [
     ("person_debts", "paid_to_account_id", "INTEGER"),
     ("household_bills", "is_recurring", "INTEGER NOT NULL DEFAULT 0"),
     ("household_bills", "recurring_day", "INTEGER"),
+    # Cuentas del hogar: logo, compras en cuotas (N cargos mensuales) y abonos
+    ("household_bills", "logo_path", "TEXT"),
+    ("household_bills", "installments_total", "INTEGER NOT NULL DEFAULT 1"),
+    ("household_bills", "installment_number", "INTEGER NOT NULL DEFAULT 1"),
+    ("household_bills", "series_id", "TEXT"),
+    ("household_bills", "collected_amount", "REAL NOT NULL DEFAULT 0"),
 ]
 
 

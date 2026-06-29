@@ -1,10 +1,21 @@
 """Flujo de caja proyectado: saldo + ingresos - gastos por día/mes."""
+import calendar
 from datetime import date, timedelta
 from flask import Blueprint, render_template, request
 from database import db
 from modules.helpers import safe_int
+from modules.planning import get_monthly_income, get_setting
 
 bp = Blueprint("cashflow", __name__)
+
+
+def _income_day():
+    """Día del mes en que se proyecta el sueldo (configurable, por defecto 27)."""
+    try:
+        d = int(get_setting("income_day", "27"))
+    except (TypeError, ValueError):
+        d = 27
+    return min(max(d, 1), 31)
 
 
 @bp.route("/")
@@ -158,30 +169,45 @@ def index():
                 "amount": pd["pending_amount"],
             })
 
-    # 7) Estimar ingresos recurrentes (basado en histórico)
-    # Promedio de ingresos mensuales últimos 3 meses
-    avg_income = db.query("""
-        SELECT AVG(monthly_total) AS avg_total FROM (
-            SELECT strftime('%Y-%m', date) AS m, SUM(amount) AS monthly_total
-            FROM transactions
+    # 7) Ingreso esperado (sueldo) proyectado el día 27 de cada mes.
+    #    En el mes en curso se ajusta al remanente según lo ya recibido
+    #    (así el flujo se va actualizando con los valores reales).
+    monthly_income = get_monthly_income()
+    pay_day = _income_day()
+    if monthly_income > 0:
+        # Ingresos reales ya recibidos en el mes en curso (para no duplicar).
+        ym_now = today.strftime("%Y-%m")
+        real_now = db.query("""
+            SELECT COALESCE(SUM(amount),0) AS t FROM transactions
             WHERE type='income' AND status='pagado'
-                  AND date >= date('now', '-3 months')
-            GROUP BY m
-        )
-    """, one=True)
-    avg_per_month = (avg_income["avg_total"] or 0) if avg_income else 0
-    # Proyectar el ingreso promedio al primer día de cada mes futuro
-    if avg_per_month > 0:
+                  AND strftime('%Y-%m', date)=?
+        """, (ym_now,), one=True)["t"] or 0
+
         cursor = date(today.year, today.month, 1)
-        cursor = _add_one_month(cursor)  # comenzar el próximo mes
         while cursor <= end_date:
-            d_iso = cursor.isoformat()
-            if d_iso in days_data:
-                days_data[d_iso]["inflows"] += avg_per_month
+            y, m = cursor.year, cursor.month
+            last_day = calendar.monthrange(y, m)[1]
+            payday = date(y, m, min(pay_day, last_day))
+            is_current = (y == today.year and m == today.month)
+
+            if is_current:
+                amount = max(0, monthly_income - real_now)
+                # Si el día de pago ya pasó pero aún falta por recibir,
+                # se muestra el remanente a partir de hoy.
+                if payday < today:
+                    payday = today
+                label = "Ingreso esperado (resto del mes)" if real_now > 0 else "Ingreso esperado (sueldo)"
+            else:
+                amount = monthly_income
+                label = "Ingreso esperado (sueldo)"
+
+            d_iso = payday.isoformat()
+            if amount > 0 and today <= payday <= end_date and d_iso in days_data:
+                days_data[d_iso]["inflows"] += amount
                 days_data[d_iso]["events"].append({
                     "kind": "income_estimate",
-                    "title": "Ingreso estimado (promedio)",
-                    "amount": avg_per_month,
+                    "title": label,
+                    "amount": amount,
                 })
             cursor = _add_one_month(cursor)
 

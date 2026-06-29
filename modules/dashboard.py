@@ -1,11 +1,104 @@
 """Dashboard principal: vista resumen de todo."""
-from datetime import date
+from datetime import date, datetime
 from flask import Blueprint, render_template, request
 from database import db
-from modules.helpers import safe_int
+from modules.helpers import safe_int, add_months, month_name_es
 from modules.planning import compute_commitments, get_monthly_income
 
 bp = Blueprint("dashboard", __name__)
+
+
+def compute_debt_trend(months_fwd=12):
+    """Endeudamiento total (tarjetas + créditos), tendencia y proyección.
+
+    - Guarda un snapshot mensual del total para construir el histórico real.
+    - Proyecta cómo debería ir bajando según el calendario de cuotas
+      (cuotas de créditos + cuotas de tarjetas), sin asumir nuevas compras.
+    """
+    today = date.today()
+    ym = f"{today.year}-{today.month:02d}"
+
+    cards_debt = db.query("""
+        SELECT COALESCE(SUM(used_amount),0) AS t FROM credit_cards WHERE status='activa'
+    """, one=True)["t"] or 0
+    loans_debt = db.query("""
+        SELECT COALESCE(SUM(pending_amount),0) AS t FROM loans WHERE status='vigente'
+    """, one=True)["t"] or 0
+    total = cards_debt + loans_debt
+
+    # Snapshot del mes en curso (upsert)
+    existing = db.query("SELECT id FROM debt_snapshots WHERE ym=?", (ym,), one=True)
+    if existing:
+        db.update("debt_snapshots", {
+            "cards_debt": cards_debt, "loans_debt": loans_debt, "total_debt": total,
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        }, "id = ?", (existing["id"],))
+    else:
+        db.insert("debt_snapshots", {
+            "ym": ym, "cards_debt": cards_debt,
+            "loans_debt": loans_debt, "total_debt": total,
+        })
+
+    # Histórico real (snapshots hasta el mes actual)
+    snaps = db.query("""
+        SELECT ym, total_debt FROM debt_snapshots
+        WHERE ym <= ? ORDER BY ym ASC LIMIT 12
+    """, (ym,))
+
+    # Reducción mensual programada (cuotas pendientes por mes futuro)
+    reduce_by_month = {}
+    for r in db.query("""
+        SELECT strftime('%Y-%m', due_date) AS m, COALESCE(SUM(amount),0) AS t
+        FROM loan_installments WHERE status != 'pagada' GROUP BY m
+    """):
+        if r["m"]:
+            reduce_by_month[r["m"]] = reduce_by_month.get(r["m"], 0) + (r["t"] or 0)
+    for r in db.query("""
+        SELECT strftime('%Y-%m', estimated_date) AS m, COALESCE(SUM(amount),0) AS t
+        FROM card_installments WHERE status != 'pagada' GROUP BY m
+    """):
+        if r["m"]:
+            reduce_by_month[r["m"]] = reduce_by_month.get(r["m"], 0) + (r["t"] or 0)
+
+    # Serie para el gráfico: histórico real + proyección
+    labels, real, projected = [], [], []
+    for s in snaps:
+        labels.append(s["ym"])
+        real.append(round(s["total_debt"]))
+        projected.append(None)
+    # punto de unión: el mes actual también es el inicio de la proyección
+    if projected:
+        projected[-1] = round(total)
+
+    running = total
+    start = date(today.year, today.month, 1)
+    for i in range(1, months_fwd + 1):
+        d = add_months(start, i)
+        key = f"{d.year}-{d.month:02d}"
+        running = max(0, running - reduce_by_month.get(key, 0))
+        labels.append(key)
+        real.append(None)
+        projected.append(round(running))
+
+    proj_end = running
+    proj_drop = max(0, total - proj_end)
+    proj_end_label = f"{month_name_es(add_months(start, months_fwd).month, short=True)} {add_months(start, months_fwd).year}"
+
+    # Dirección de la tendencia
+    direction, delta_prev = "flat", None
+    if len(snaps) >= 2:
+        delta_prev = snaps[-1]["total_debt"] - snaps[-2]["total_debt"]
+        direction = "up" if delta_prev > 0 else ("down" if delta_prev < 0 else "flat")
+    elif proj_drop > 0:
+        direction = "down"
+
+    return {
+        "cards_debt": cards_debt, "loans_debt": loans_debt, "total": total,
+        "direction": direction, "delta_prev": delta_prev,
+        "labels": labels, "real": real, "projected": projected,
+        "proj_end": proj_end, "proj_drop": proj_drop, "proj_end_label": proj_end_label,
+        "has_schedule": bool(reduce_by_month),
+    }
 
 
 @bp.route("/")
@@ -251,11 +344,16 @@ def index():
     """, (ym_str,), one=True)["t"] or 0
     spend_remaining = spend_ceiling - variable_spent
 
+    # ----- Endeudamiento total y tendencia -----
+    debt = compute_debt_trend()
+
     return render_template(
         "dashboard.html",
         year=year, month=month,
         accounts=accounts,
         cards=cards,
+        debt=debt,
+        total_debt=debt["total"],
         monthly_income=monthly_income,
         this_month_plan=this_month_plan,
         spend_ceiling=spend_ceiling,

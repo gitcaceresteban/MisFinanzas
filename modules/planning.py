@@ -136,6 +136,7 @@ def index():
     return render_template("planning.html",
                           months=months,
                           income=income,
+                          income_day=safe_int(get_setting("income_day", "27")) or 27,
                           this_month=this_month,
                           spent=spent,
                           ceiling=ceiling,
@@ -146,6 +147,9 @@ def index():
 @bp.route("/ingreso", methods=["POST"])
 def save_income():
     set_setting("monthly_income", str(int(parse_money(request.form.get("monthly_income")))))
+    pay_day = safe_int(request.form.get("income_day"))
+    if pay_day:
+        set_setting("income_day", str(min(max(pay_day, 1), 31)))
     db.audit("update", "setting", None, {"monthly_income": request.form.get("monthly_income")})
     flash("Ingreso estimado actualizado", "success")
     return redirect(request.form.get("next") or url_for("planning.index"))

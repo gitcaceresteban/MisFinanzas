@@ -233,6 +233,11 @@ CREATE TABLE IF NOT EXISTS household_bills (
     status TEXT NOT NULL DEFAULT 'pendiente', -- pendiente, pagada, parcial, vencida
     split_type TEXT NOT NULL DEFAULT 'equal', -- equal, fixed, percent, custom
     attachment_path TEXT,
+    logo_path TEXT,                            -- imagen/logo de la cuenta
+    installments_total INTEGER NOT NULL DEFAULT 1,   -- nº de cuotas en que me lo pagan
+    installment_number INTEGER NOT NULL DEFAULT 1,   -- cuál cuota es (1..N)
+    series_id TEXT,                            -- agrupa las cuotas de una misma compra
+    collected_amount REAL NOT NULL DEFAULT 0,  -- total abonado hacia esta cuenta
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -242,6 +247,28 @@ CREATE TABLE IF NOT EXISTS household_bills (
 );
 CREATE INDEX IF NOT EXISTS idx_hb_status ON household_bills(status);
 CREATE INDEX IF NOT EXISTS idx_hb_due ON household_bills(due_date);
+CREATE INDEX IF NOT EXISTS idx_hb_series ON household_bills(series_id);
+
+-- ---------------------------------------------------
+-- Abonos (pagos parciales) de cuentas del hogar
+-- ---------------------------------------------------
+CREATE TABLE IF NOT EXISTS household_bill_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bill_id INTEGER NOT NULL,
+    participant_id INTEGER,
+    person_id INTEGER,
+    amount REAL NOT NULL,
+    date TEXT NOT NULL,
+    account_id INTEGER,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (bill_id) REFERENCES household_bills(id) ON DELETE CASCADE,
+    FOREIGN KEY (participant_id) REFERENCES household_bill_participants(id) ON DELETE SET NULL,
+    FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE SET NULL,
+    FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_hbpay_bill ON household_bill_payments(bill_id);
+CREATE INDEX IF NOT EXISTS idx_hbpay_date ON household_bill_payments(date);
 
 -- ---------------------------------------------------
 -- Participantes en cuentas del hogar
@@ -427,3 +454,17 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ---------------------------------------------------
+-- Snapshots mensuales de endeudamiento (para ver la tendencia)
+-- ---------------------------------------------------
+CREATE TABLE IF NOT EXISTS debt_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ym TEXT NOT NULL UNIQUE,          -- 'YYYY-MM'
+    cards_debt REAL NOT NULL DEFAULT 0,
+    loans_debt REAL NOT NULL DEFAULT 0,
+    total_debt REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_debt_snap_ym ON debt_snapshots(ym);

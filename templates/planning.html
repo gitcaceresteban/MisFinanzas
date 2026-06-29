@@ -21,6 +21,12 @@
                            class="input money-input text-lg font-bold" value="{{ income }}" placeholder="0">
                 </div>
                 <p class="hint">Tu sueldo + ingresos fijos esperados (ej. 2.100.000).</p>
+                <div>
+                    <label class="label">Día de pago (para el flujo de caja)</label>
+                    <input type="number" min="1" max="31" name="income_day"
+                           class="input" value="{{ income_day }}" placeholder="27">
+                    <p class="hint">Día del mes en que se proyecta tu sueldo.</p>
+                </div>
                 <button type="submit" class="btn-primary w-full justify-center">Guardar ingreso</button>
             </form>
         </div>
@@ -82,17 +88,29 @@
             </div>
             <div class="stat-card">
                 <div class="stat-label">Mes más ajustado</div>
-                <div class="stat-value num" :class="minFree < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'" x-text="fmt(minFree)"></div>
+                <div class="stat-value num" :class="freeClass(minFree)" x-text="fmt(minFree)"></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Veredicto</div>
-                <div class="stat-value text-lg" x-text="minFree < 0 ? '⚠️ Te aprieta' : '✅ Alcanza'"></div>
+                <div class="stat-value text-lg" :class="freeClass(minFree)" x-text="verdict"></div>
             </div>
         </div>
 
-        <div class="rounded-xl bg-primary-50 dark:bg-primary-500/10 p-3 mb-4 text-sm" x-show="cuotas > 0" x-cloak>
-            💡 Para no quedar en rojo, tu cuota no debería superar
-            <span class="font-bold num" x-text="fmt(maxAffordable)"></span> al mes.
+        <div class="rounded-xl p-3 mb-4 text-sm"
+             :class="minFree < 0 ? 'bg-rose-50 dark:bg-rose-500/10' : (minFree < safeMin ? 'bg-amber-50 dark:bg-amber-500/10' : 'bg-emerald-50 dark:bg-emerald-500/10')"
+             x-show="cuotas > 0" x-cloak>
+            <template x-if="minFree < 0">
+                <span>⛔ Con esta cuota quedas en rojo. Para no pasarte, tu cuota no debería superar
+                <span class="font-bold num" x-text="fmt(maxAffordable)"></span> al mes.</span>
+            </template>
+            <template x-if="minFree >= 0 && minFree < safeMin">
+                <span>⚠️ Alcanza pero quedas muy ajustado (bajo <span class="num" x-text="fmt(safeMin)"></span>). Para mantener colchón, tu cuota no debería superar
+                <span class="font-bold num" x-text="fmt(maxComfortable)"></span> al mes.</span>
+            </template>
+            <template x-if="minFree >= safeMin">
+                <span>✅ Te alcanza con holgura. Podrías subir la cuota hasta
+                <span class="font-bold num" x-text="fmt(maxComfortable)"></span> al mes y seguir con colchón.</span>
+            </template>
         </div>
 
         <div class="overflow-x-auto">
@@ -113,7 +131,7 @@
                             <td class="text-right num" x-text="fmt(m.income)"></td>
                             <td class="text-right num text-slate-500" x-text="fmt(m.committed)"></td>
                             <td class="text-right num" :class="m.added > 0 ? 'text-violet-600 dark:text-violet-400 font-semibold' : 'text-slate-300 dark:text-slate-600'" x-text="m.added > 0 ? '+' + fmt(m.added) : '—'"></td>
-                            <td class="text-right num font-bold" :class="m.free < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'" x-text="fmt(m.free)"></td>
+                            <td class="text-right num font-bold" :class="freeClass(m.free)" x-text="fmt(m.free)"></td>
                         </tr>
                     </template>
                 </tbody>
@@ -133,12 +151,28 @@ function simulator() {
         projection: [],
         minFree: 0,
         maxAffordable: 0,
+        maxComfortable: 0,
+        minBaseFree: 0,
+        safeMin: 300000,   // colchón mínimo recomendado
         get months() { return this.base; },
         init() { this.recalc(); },
         fmt(n) {
+            if (n === Infinity) return '—';
             n = Math.round(n || 0);
             const s = n < 0 ? '-' : '';
             return s + '$' + Math.abs(n).toLocaleString('es-CL').replace(/,/g, '.');
+        },
+        // Color según el disponible: rojo (<0), amarillo (0–300k), verde (>=300k)
+        freeClass(v) {
+            if (v < 0) return 'text-rose-600 dark:text-rose-400';
+            if (v < this.safeMin) return 'text-amber-600 dark:text-amber-400';
+            return 'text-emerald-600 dark:text-emerald-400';
+        },
+        get verdict() {
+            if (this.minFree === Infinity) return '—';
+            if (this.minFree < 0) return '⛔ No alcanza';
+            if (this.minFree < this.safeMin) return '⚠️ Muy ajustado';
+            return '✅ Alcanza';
         },
         recalc() {
             this.amount = window.parseMoney ? parseMoney(this.$refs.amount ? this.$refs.amount.value : '0') : 0;
@@ -155,8 +189,11 @@ function simulator() {
                 return { label: m.label, income: m.income, committed: m.committed, added, free };
             });
             this.minFree = this.cuotaValue > 0 ? minFree : Infinity;
+            this.minBaseFree = minBaseFree === Infinity ? 0 : minBaseFree;
             // cuota máxima que mantiene todos los meses de la ventana >= 0
-            this.maxAffordable = Math.max(0, minBaseFree === Infinity ? 0 : minBaseFree);
+            this.maxAffordable = Math.max(0, this.minBaseFree);
+            // cuota máxima dejando el colchón de seguridad (300k)
+            this.maxComfortable = Math.max(0, this.minBaseFree - this.safeMin);
         }
     }
 }

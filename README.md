@@ -16,19 +16,19 @@ Aplicación web completa para gestionar tus finanzas personales, pensada para co
 
 ## ✨ Características
 
-- 📊 **Dashboard** con KPIs, **“disponible para gastar este mes”**, gráfico de gastos y evolución de 6 meses
-- 🧮 **Plan & escenarios** — ingresa tu sueldo y mira cuánto puedes gastar; **simulador** de compras en cuotas que proyecta los próximos 12 meses y te dice de cuánto puede ser la cuota sin quedar en rojo
+- 📊 **Dashboard** con KPIs, **“disponible para gastar este mes”**, gráfico de gastos y evolución de 6 meses; el **cupo disponible** se puede filtrar por tarjeta y hay una tarjeta de **deuda total** (tarjetas + créditos) con **tendencia de endeudamiento** (histórico real + proyección de cómo debería ir bajando)
+- 🧮 **Plan & escenarios** — ingresa tu sueldo y mira cuánto puedes gastar; **simulador** de compras en cuotas que proyecta los próximos 12 meses con **veredicto por colchón**: ✅ alcanza (≥ $300.000), ⚠️ muy ajustado (entre $0 y $300.000) o ⛔ no alcanza (< $0)
 - 🏦 **Bancos, cuentas y tarjetas** — 11 bancos chilenos **precargados** con sus colores; ahora puedes **subir el logo** de cada banco y se ve en tarjetas y créditos
 - 💳 **Tarjetas de crédito** con cupos, días de pago, facturación y cuotas
 - 📉 **Créditos** (consumo, avances, súper avances, compras en cuotas) con calendario de cuotas y **página “Pagar mi crédito”** que descuenta de tu cuenta
 - 💸 **Gastos e ingresos** con categorías, adjuntos, filtros y exportación CSV
 - 🤝 **Gastos compartidos** — al crear un gasto puedes repartirlo entre personas (genera **cuentas por cobrar**) o mandarlo a **Cuentas del Hogar**; al marcar que te pagaron, el monto se **suma a tu cuenta**
 - 👥 **Personas y deudas** entre amigos/familia, con abonos parciales
-- 🏠 **Cuentas del hogar** compartidas (equitativa, fija, porcentual o personalizada)
+- 🏠 **Cuentas del hogar** compartidas (equitativa, fija, porcentual o personalizada), **con logo**, **separadas por mes** (cargos / abonado / neto por cobrar), **compras en cuotas** que generan un cargo en el mes actual y los siguientes, y **registro de abonos** con historial para ver cuánto falta por cobrar
 - 🔁 **Pagos recurrentes** con **logo del proveedor** y opción “me lo devuelven” (cuentas de terceros que pagas tú)
 - 🎯 **Presupuestos** por categoría/cuenta/persona/total
 - 💯 **Montos con autoformato** — escribes `1234567` y se muestra `1.234.567` al instante
-- 📅 **Calendario** financiero unificado · 📈 **Flujo de caja proyectado**
+- 📅 **Calendario** financiero unificado · 📈 **Flujo de caja proyectado** que ahora **proyecta también tu ingreso esperado** (sueldo el día de pago, configurable) y se ajusta con los ingresos reales del mes
 - 🔔 **Alertas** automáticas · 🔌 **API REST** con token (Telegram, Atajos iOS, Home Assistant)
 - 🌗 **Modo claro / oscuro / automático** · 📱 **Responsive** (iPhone y desktop)
 - 💾 **Backups** manuales y automatizables
