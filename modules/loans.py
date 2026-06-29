@@ -1,4 +1,5 @@
 """Créditos, avances y deudas propias (consumo, avance, súper avance, cuotas)."""
+import calendar
 from datetime import datetime, date
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from database import db
@@ -8,6 +9,53 @@ from modules.helpers import (
 )
 
 bp = Blueprint("loans", __name__)
+
+
+def iter_loan_payments(start: date, end: date):
+    """Devuelve los pagos de cuota de TODOS los créditos vigentes entre
+    `start` y `end` (incluidos).
+
+    Usa el calendario de cuotas (loan_installments) si existe; si el crédito
+    NO tiene calendario generado, sintetiza la cuota mensual a partir de
+    installment_amount + día de pago + cuotas pendientes. Así ningún crédito
+    propio (p.ej. un crédito de consumo) queda fuera de las proyecciones.
+    """
+    out = []
+    loans = db.query("SELECT * FROM loans WHERE status='vigente'")
+    for l in loans:
+        rows = db.query(
+            "SELECT amount, due_date, status FROM loan_installments WHERE loan_id=?",
+            (l["id"],))
+        if rows:
+            for r in rows:
+                if r["status"] == "pagada":
+                    continue
+                d = parse_date_cl(r["due_date"])
+                if d and start <= d <= end:
+                    out.append({"date": d, "amount": r["amount"] or 0,
+                                "loan_id": l["id"], "name": l["name"]})
+            continue
+
+        # Sin calendario: sintetizar la cuota mensual
+        amt = l["installment_amount"] or 0
+        if amt <= 0:
+            continue
+        anchor = (parse_date_cl(l["next_payment_date"])
+                  or parse_date_cl(l["first_payment_date"])
+                  or date(start.year, start.month, 1))
+        day = l["payment_day"] or anchor.day
+        remaining = l["pending_installments"] or 0
+        if remaining <= 0:
+            remaining = (end.year - start.year) * 12 + (end.month - start.month) + 2
+        anchor_m = date(anchor.year, anchor.month, 1)
+        for k in range(int(remaining)):
+            m = add_months(anchor_m, k)
+            last_day = calendar.monthrange(m.year, m.month)[1]
+            ev = date(m.year, m.month, min(int(day), last_day))
+            if start <= ev <= end:
+                out.append({"date": ev, "amount": amt,
+                            "loan_id": l["id"], "name": l["name"]})
+    return out
 
 LOAN_TYPES = [
     ("consumo", "Crédito de consumo"),

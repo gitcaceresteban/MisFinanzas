@@ -48,13 +48,17 @@ def compute_commitments():
     ym_set = {k[2]: {"loans": 0, "cards": 0, "recurring": 0, "household": 0, "billed": 0}
               for k in keys}
 
-    # Cuotas de créditos pendientes
-    for r in db.query("""
-        SELECT strftime('%Y-%m', due_date) AS ym, COALESCE(SUM(amount),0) AS t
-        FROM loan_installments WHERE status != 'pagada' GROUP BY ym
-    """):
-        if r["ym"] in ym_set:
-            ym_set[r["ym"]]["loans"] += r["t"] or 0
+    # Cuotas de créditos (con calendario o sintetizadas si no lo tienen),
+    # para considerar TODAS las deudas propias en el horizonte.
+    import calendar
+    from modules.loans import iter_loan_payments
+    h_start = date(keys[0][0], keys[0][1], 1)
+    h_end = date(keys[-1][0], keys[-1][1],
+                 calendar.monthrange(keys[-1][0], keys[-1][1])[1])
+    for ev in iter_loan_payments(h_start, h_end):
+        ym = ev["date"].strftime("%Y-%m")
+        if ym in ym_set:
+            ym_set[ym]["loans"] += ev["amount"]
 
     # Cuotas de tarjetas estimadas
     for r in db.query("""

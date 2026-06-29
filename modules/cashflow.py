@@ -86,22 +86,17 @@ def index():
                 "amount": -ci["amount"],
             })
 
-    # 3) Cuotas de créditos
-    loan_inst = db.query("""
-        SELECT li.due_date, li.amount, l.name AS loan_name
-        FROM loan_installments li
-        JOIN loans l ON l.id = li.loan_id
-        WHERE li.status = 'pendiente'
-              AND li.due_date BETWEEN ? AND ?
-    """, (today.isoformat(), end_date.isoformat()))
-    for li in loan_inst:
-        d_iso = li["due_date"]
+    # 3) Cuotas de créditos (con calendario o sintetizadas si no lo tienen,
+    #    para que NINGUNA deuda propia quede fuera —p.ej. crédito de consumo)
+    from modules.loans import iter_loan_payments
+    for ev in iter_loan_payments(today, end_date):
+        d_iso = ev["date"].isoformat()
         if d_iso in days_data:
-            days_data[d_iso]["outflows"] += li["amount"]
+            days_data[d_iso]["outflows"] += ev["amount"]
             days_data[d_iso]["events"].append({
                 "kind": "loan",
-                "title": f"Cuota {li['loan_name']}",
-                "amount": -li["amount"],
+                "title": f"Cuota {ev['name']}",
+                "amount": -ev["amount"],
             })
 
     # 4) Recurrentes mensuales activos

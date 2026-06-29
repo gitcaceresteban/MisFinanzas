@@ -8,7 +8,7 @@
     <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
             <h2 class="text-2xl font-bold">Cuentas del hogar</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Gastos compartidos, cuotas y abonos · separado por mes</p>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Cargos por mes, cuotas y abonos · el historial de cada mes se conserva</p>
         </div>
         <a href="/hogar/nueva" class="btn-primary">
             <i data-lucide="plus" class="w-4 h-4"></i>
@@ -28,32 +28,73 @@
         </div>
         <div class="stat-card">
             <div class="stat-label">Neto por cobrar</div>
-            <div class="stat-value num text-emerald-600 dark:text-emerald-400">{{ total_to_collect | clp }}</div>
+            <div class="stat-value num text-rose-600 dark:text-rose-400">{{ total_to_collect | clp }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Pagadas (mes)</div>
-            <div class="stat-value num">{{ total_paid_month | clp }}</div>
+            <div class="stat-label">Abonado (mes)</div>
+            <div class="stat-value num text-emerald-600 dark:text-emerald-400">{{ total_abonado_month | clp }}</div>
         </div>
     </div>
 
-    {% if grouped %}
+    {% if has_any %}
         {% for g in grouped %}
-        <div class="card overflow-hidden">
+        <div class="card overflow-hidden" x-data="{ showAbono: false }">
             <!-- Cabecera del mes -->
-            <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3
+            <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800
                         {% if g.key == current_ym %}bg-primary-50/60 dark:bg-primary-500/10{% endif %}">
-                <h3 class="text-base font-bold flex items-center gap-2">
-                    <span>📅</span> {{ g.label }}
-                    {% if g.key == current_ym %}<span class="badge badge-blue">Este mes</span>{% endif %}
-                </h3>
-                <div class="flex flex-wrap items-center gap-4 text-xs">
-                    <span class="text-slate-500 dark:text-slate-400">Cargos <span class="num font-semibold text-slate-700 dark:text-slate-200">{{ g.cargos | clp }}</span></span>
-                    <span class="text-slate-500 dark:text-slate-400">Por cobrar <span class="num font-semibold">{{ g.por_cobrar | clp }}</span></span>
-                    <span class="text-slate-500 dark:text-slate-400">Abonado <span class="num font-semibold text-emerald-600 dark:text-emerald-400">{{ g.abonado | clp }}</span></span>
-                    <span class="text-slate-500 dark:text-slate-400">Neto <span class="num font-bold {% if g.neto > 0 %}text-rose-600 dark:text-rose-400{% else %}text-emerald-600 dark:text-emerald-400{% endif %}">{{ g.neto | clp }}</span></span>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="text-base font-bold flex items-center gap-2">
+                        <span>📅</span> {{ g.label }}
+                        {% if g.key == current_ym %}<span class="badge badge-blue">Este mes</span>{% endif %}
+                    </h3>
+                    <div class="flex flex-wrap items-center gap-4 text-xs">
+                        <span class="text-slate-500 dark:text-slate-400">Facturado <span class="num font-semibold text-slate-700 dark:text-slate-200">{{ g.cargos | clp }}</span></span>
+                        <span class="text-slate-500 dark:text-slate-400">Por cobrar <span class="num font-semibold">{{ g.por_cobrar | clp }}</span></span>
+                        <span class="text-slate-500 dark:text-slate-400">Abonado <span class="num font-semibold text-emerald-600 dark:text-emerald-400">{{ g.abonado | clp }}</span></span>
+                        <span class="text-slate-500 dark:text-slate-400">Neto <span class="num font-bold {% if g.neto > 0 %}text-rose-600 dark:text-rose-400{% else %}text-emerald-600 dark:text-emerald-400{% endif %}">{{ g.neto | clp }}</span></span>
+                        {% if g.key != 'sin-fecha' %}
+                        <button type="button" @click="showAbono = !showAbono" class="btn-ghost text-xs">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Añadir abono
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
+
+                <!-- Form abono del mes -->
+                {% if g.key != 'sin-fecha' %}
+                <div x-show="showAbono" x-cloak x-transition class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                    <form method="POST" action="/hogar/abono" class="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
+                        <input type="hidden" name="ym" value="{{ g.key }}">
+                        <div>
+                            <label class="label text-xs">Monto</label>
+                            <input type="text" inputmode="numeric" name="amount" required class="input money-input" placeholder="Ej: 50.000">
+                        </div>
+                        <div>
+                            <label class="label text-xs">Fecha</label>
+                            <input type="date" name="date" class="input" value="{{ today }}">
+                        </div>
+                        <div>
+                            <label class="label text-xs">¿Quién? (opcional)</label>
+                            <select name="person_id" class="select">
+                                <option value="">—</option>
+                                {% for p in people %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="label text-xs">¿A qué cuenta? (opcional)</label>
+                            <select name="account_id" class="select">
+                                <option value="">No depositar</option>
+                                {% for a in accounts %}<option value="{{ a.id }}">{{ a.name }}{% if a.bank_name %} · {{ a.bank_name }}{% endif %}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary justify-center">Registrar</button>
+                    </form>
+                </div>
+                {% endif %}
             </div>
 
+            <!-- Cargos del mes -->
+            {% if g.bills %}
             <div class="overflow-x-auto">
                 <table class="table">
                     <thead>
@@ -62,8 +103,7 @@
                             <th>Categoría</th>
                             <th>Estado</th>
                             <th class="text-right">Monto</th>
-                            <th class="text-right">Abonado</th>
-                            <th class="text-right">Falta cobrar</th>
+                            <th class="text-right">Por cobrar</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -89,11 +129,10 @@
                             <td><span class="text-xs">{{ b.category_name or '—' }}</span></td>
                             <td><span class="badge badge-{{ b.status | status_color }} capitalize">{{ b.status }}</span></td>
                             <td class="text-right font-semibold num">{{ b.amount | clp }}</td>
-                            <td class="text-right num text-emerald-600 dark:text-emerald-400">{{ b.abonado | clp }}</td>
-                            <td class="text-right font-medium num {% if b.pendiente > 0 %}text-rose-600 dark:text-rose-400{% endif %}">{{ b.pendiente | clp }}</td>
+                            <td class="text-right num">{{ b.por_cobrar | clp }}</td>
                             <td class="text-right">
                                 <div class="flex justify-end gap-1">
-                                    <a href="/hogar/{{ b.id }}" class="btn-ghost p-1.5" title="Ver / abonar"><i data-lucide="eye" class="w-3.5 h-3.5"></i></a>
+                                    <a href="/hogar/{{ b.id }}" class="btn-ghost p-1.5" title="Ver"><i data-lucide="eye" class="w-3.5 h-3.5"></i></a>
                                     {% if b.status != 'pagada' %}
                                     <form action="/hogar/{{ b.id }}/marcar-pagada" method="POST">
                                         <button type="submit" class="btn-ghost p-1.5" title="Marcar pagada"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i></button>
@@ -110,10 +149,37 @@
                     </tbody>
                 </table>
             </div>
+            {% else %}
+            <div class="px-5 py-3 text-xs text-slate-400">Sin cargos registrados en este mes.</div>
+            {% endif %}
+
+            <!-- Abonos del mes -->
+            {% if g.payments %}
+            <div class="px-5 py-3 border-t border-slate-100 dark:border-slate-800">
+                <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Abonos recibidos</div>
+                <div class="space-y-1.5">
+                    {% for pay in g.payments %}
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center gap-2">
+                            <span class="text-emerald-600 dark:text-emerald-400">💰</span>
+                            <span class="font-medium">{{ pay.person_name or 'Abono' }}</span>
+                            <span class="text-xs text-slate-400">{{ pay.date | fecha }}{% if pay.account_name %} · → {{ pay.account_name }}{% endif %}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold num text-emerald-600 dark:text-emerald-400">+{{ pay.amount | clp }}</span>
+                            <form action="/hogar/abono/{{ pay.id }}/eliminar" method="POST" data-confirm="¿Eliminar este abono?{% if pay.account_id %} Se descontará de la cuenta.{% endif %}">
+                                <button type="submit" class="btn-ghost p-1" title="Eliminar abono"><i data-lucide="x" class="w-3.5 h-3.5 text-rose-400"></i></button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
         {% endfor %}
     {% else %}
-        {% with icon='home', title='Sin cuentas del hogar', message='Aquí van los gastos compartidos: arriendo, servicios, comida común... y se divide entre los participantes.', action_url='/hogar/nueva', action_label='Crear primera' %}
+        {% with icon='home', title='Sin cuentas del hogar', message='Aquí van los gastos compartidos: arriendo, servicios, comida común... separados por mes, con cuotas y abonos.', action_url='/hogar/nueva', action_label='Crear primera' %}
             {% include 'partials/empty_state.html' %}
         {% endwith %}
     {% endif %}

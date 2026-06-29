@@ -45,14 +45,15 @@ def compute_debt_trend(months_fwd=12):
         WHERE ym <= ? ORDER BY ym ASC LIMIT 12
     """, (ym,))
 
-    # Reducción mensual programada (cuotas pendientes por mes futuro)
+    # Reducción mensual programada (cuotas pendientes por mes futuro).
+    # Incluye créditos con y sin calendario (sintetizados) + cuotas de tarjetas.
+    from modules.loans import iter_loan_payments
     reduce_by_month = {}
-    for r in db.query("""
-        SELECT strftime('%Y-%m', due_date) AS m, COALESCE(SUM(amount),0) AS t
-        FROM loan_installments WHERE status != 'pagada' GROUP BY m
-    """):
-        if r["m"]:
-            reduce_by_month[r["m"]] = reduce_by_month.get(r["m"], 0) + (r["t"] or 0)
+    h_start = date(today.year, today.month, 1)
+    h_end = add_months(h_start, months_fwd + 1)
+    for ev in iter_loan_payments(h_start, h_end):
+        m = ev["date"].strftime("%Y-%m")
+        reduce_by_month[m] = reduce_by_month.get(m, 0) + ev["amount"]
     for r in db.query("""
         SELECT strftime('%Y-%m', estimated_date) AS m, COALESCE(SUM(amount),0) AS t
         FROM card_installments WHERE status != 'pagada' GROUP BY m

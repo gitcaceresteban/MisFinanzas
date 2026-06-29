@@ -250,25 +250,24 @@ CREATE INDEX IF NOT EXISTS idx_hb_due ON household_bills(due_date);
 CREATE INDEX IF NOT EXISTS idx_hb_series ON household_bills(series_id);
 
 -- ---------------------------------------------------
--- Abonos (pagos parciales) de cuentas del hogar
+-- Abonos de cuentas del hogar (a nivel de MES, no de una cuenta puntual).
+-- Permite registrar pagos parciales que llegan de a poco (50k, 30k, ...).
 -- ---------------------------------------------------
-CREATE TABLE IF NOT EXISTS household_bill_payments (
+CREATE TABLE IF NOT EXISTS household_payments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bill_id INTEGER NOT NULL,
-    participant_id INTEGER,
+    ym TEXT NOT NULL,            -- 'YYYY-MM' mes al que aplica el abono
     person_id INTEGER,
     amount REAL NOT NULL,
     date TEXT NOT NULL,
     account_id INTEGER,
+    tx_id INTEGER,               -- ingreso generado al depositar en una cuenta
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (bill_id) REFERENCES household_bills(id) ON DELETE CASCADE,
-    FOREIGN KEY (participant_id) REFERENCES household_bill_participants(id) ON DELETE SET NULL,
     FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE SET NULL,
     FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE SET NULL
 );
-CREATE INDEX IF NOT EXISTS idx_hbpay_bill ON household_bill_payments(bill_id);
-CREATE INDEX IF NOT EXISTS idx_hbpay_date ON household_bill_payments(date);
+CREATE INDEX IF NOT EXISTS idx_hpay_ym ON household_payments(ym);
+CREATE INDEX IF NOT EXISTS idx_hpay_date ON household_payments(date);
 
 -- ---------------------------------------------------
 -- Participantes en cuentas del hogar

@@ -1,4 +1,4 @@
-"""Cuentas del hogar: división entre personas, cuotas mensuales y abonos."""
+"""Cuentas del hogar: cargos por mes, cuotas y abonos a nivel de mes."""
 import uuid
 from datetime import datetime, date
 from flask import Blueprint, render_template, request, redirect, url_for, flash
@@ -67,45 +67,19 @@ def _create_participants(bill_id, amount, split, person_ids, shares):
         })
 
 
-def _bill_collection(bill):
-    """Devuelve (por_cobrar, abonado, pendiente) de una cuenta.
-
-    Si tiene participantes, lo que me deben es la suma de sus partes; si no,
-    se considera que el monto completo es lo que me deben.
-    """
-    pc = bill.get("participants_count") or 0
-    if pc > 0:
-        por_cobrar = bill.get("sum_shares") or 0
-        abonado = bill.get("sum_paid") or 0
-    else:
-        por_cobrar = bill.get("amount") or 0
-        abonado = bill.get("collected_amount") or 0
-    pendiente = max(0, por_cobrar - abonado)
-    return por_cobrar, abonado, pendiente
+def _por_cobrar(bill):
+    """Lo que me deben de una cuenta: la suma de las partes de los
+    participantes; si no hay participantes, el monto completo."""
+    if (bill.get("participants_count") or 0) > 0:
+        return bill.get("sum_shares") or 0
+    return bill.get("amount") or 0
 
 
-def _recalc_bill_status(bill_id):
-    """Recalcula el estado de la cuenta a partir de abonos/participantes."""
-    bill = db.query("""
-        SELECT b.*,
-               (SELECT COUNT(*) FROM household_bill_participants hbp WHERE hbp.bill_id=b.id) AS participants_count,
-               (SELECT COALESCE(SUM(share_amount),0) FROM household_bill_participants hbp WHERE hbp.bill_id=b.id) AS sum_shares,
-               (SELECT COALESCE(SUM(paid_amount),0) FROM household_bill_participants hbp WHERE hbp.bill_id=b.id) AS sum_paid
-        FROM household_bills b WHERE b.id=?
-    """, (bill_id,), one=True)
-    if not bill:
-        return
-    por_cobrar, abonado, pendiente = _bill_collection(bill)
-    if por_cobrar > 0 and pendiente <= 0:
-        status = "pagada"
-    elif abonado > 0:
-        status = "parcial"
-    else:
-        status = bill["status"] if bill["status"] == "vencida" else "pendiente"
-    db.update("household_bills", {
-        "status": status,
-        "updated_at": datetime.now().isoformat(timespec="seconds"),
-    }, "id = ?", (bill_id,))
+def _ym_label(key):
+    if key == "sin-fecha":
+        return "Sin fecha"
+    y, m = key.split("-")
+    return f"{month_name_es(int(m))} {y}"
 
 
 # ----------------------------------------------------------------------
@@ -120,67 +94,79 @@ def index():
                (SELECT COUNT(*) FROM household_bill_participants hbp
                  WHERE hbp.bill_id = b.id) AS participants_count,
                (SELECT COALESCE(SUM(hbp.share_amount),0) FROM household_bill_participants hbp
-                 WHERE hbp.bill_id = b.id) AS sum_shares,
-               (SELECT COALESCE(SUM(hbp.paid_amount),0) FROM household_bill_participants hbp
-                 WHERE hbp.bill_id = b.id) AS sum_paid
+                 WHERE hbp.bill_id = b.id) AS sum_shares
         FROM household_bills b
         LEFT JOIN categories c ON c.id = b.category_id
         LEFT JOIN people p ON p.id = b.paid_by_person_id
         ORDER BY b.due_date ASC, b.name ASC
     """)
+    payments = db.query("""
+        SELECT hp.*, pe.name AS person_name, a.name AS account_name
+        FROM household_payments hp
+        LEFT JOIN people pe ON pe.id = hp.person_id
+        LEFT JOIN accounts a ON a.id = hp.account_id
+        ORDER BY hp.date DESC, hp.id DESC
+    """)
 
-    # Enriquecer cada cuenta con su cobro y agrupar por mes
+    today = date.today()
+    cur_ym = today.strftime("%Y-%m")
+
+    def get_group(key):
+        if key not in groups:
+            groups[key] = {
+                "key": key, "label": _ym_label(key),
+                "sort": "9999-99" if key == "sin-fecha" else key,
+                "bills": [], "payments": [],
+                "cargos": 0, "por_cobrar": 0, "abonado": 0, "neto": 0,
+                "pending_count": 0,
+            }
+        return groups[key]
+
     groups = {}
+    get_group(cur_ym)  # el mes en curso siempre aparece (para añadir abonos)
+
     for b in bills:
-        por_cobrar, abonado, pendiente = _bill_collection(b)
-        b["por_cobrar"] = por_cobrar
-        b["abonado"] = abonado
-        b["pendiente"] = pendiente
-
-        if b.get("due_date"):
-            d = parse_date_cl(b["due_date"])
-            if d:
-                key = f"{d.year}-{d.month:02d}"
-                label = f"{month_name_es(d.month)} {d.year}"
-                sort_key = key
-            else:
-                key, label, sort_key = "sin-fecha", "Sin fecha", "9999-99"
-        else:
-            key, label, sort_key = "sin-fecha", "Sin fecha", "9999-99"
-
-        g = groups.setdefault(key, {
-            "key": key, "label": label, "sort": sort_key, "bills": [],
-            "cargos": 0, "por_cobrar": 0, "abonado": 0, "neto": 0,
-            "pending_count": 0,
-        })
+        d = parse_date_cl(b["due_date"]) if b.get("due_date") else None
+        key = f"{d.year}-{d.month:02d}" if d else "sin-fecha"
+        pc = _por_cobrar(b)
+        b["por_cobrar"] = pc
+        g = get_group(key)
         g["bills"].append(b)
         g["cargos"] += b["amount"] or 0
-        g["por_cobrar"] += por_cobrar
-        g["abonado"] += abonado
-        g["neto"] += pendiente
+        g["por_cobrar"] += pc
         if b["status"] in ("pendiente", "parcial", "vencida"):
             g["pending_count"] += 1
+
+    for p in payments:
+        g = get_group(p["ym"] or "sin-fecha")
+        g["payments"].append(p)
+        g["abonado"] += p["amount"] or 0
+
+    for g in groups.values():
+        g["neto"] = max(0, g["por_cobrar"] - g["abonado"])
 
     grouped = sorted(groups.values(), key=lambda x: x["sort"])
 
     # Totales globales (cards superiores)
-    total_pending_amount = sum(b["amount"] for b in bills
-                       if b["status"] in ("pendiente", "parcial", "vencida"))
     total_pending_count = sum(1 for b in bills
                        if b["status"] in ("pendiente", "parcial", "vencida"))
-    total_to_collect = sum(b["pendiente"] for b in bills)
-    ym = date.today().strftime("%Y-%m")
-    total_paid_month = sum(b["amount"] for b in bills
-                          if b["status"] == "pagada"
-                          and b.get("paid_date") and b["paid_date"].startswith(ym))
+    total_pending_amount = sum(b["amount"] for b in bills
+                       if b["status"] in ("pendiente", "parcial", "vencida"))
+    total_to_collect = sum(g["neto"] for g in grouped)
+    total_abonado_month = sum(p["amount"] for p in payments if (p["ym"] or "") == cur_ym)
 
-    return render_template("household.html", bills=bills, grouped=grouped,
-                          current_ym=ym,
-                          total_pending=total_pending_amount,
-                          total_pending_amount=total_pending_amount,
+    people = db.query("SELECT * FROM people WHERE active=1 ORDER BY name")
+    accounts = db.query("""SELECT a.*, b.name AS bank_name FROM accounts a
+                           LEFT JOIN banks b ON b.id=a.bank_id
+                           WHERE a.status='activa' ORDER BY a.name""")
+
+    return render_template("household.html", grouped=grouped,
+                          has_any=bool(bills or payments),
+                          current_ym=cur_ym, people=people, accounts=accounts,
                           total_pending_count=total_pending_count,
+                          total_pending_amount=total_pending_amount,
                           total_to_collect=total_to_collect,
-                          total_paid_month=total_paid_month)
+                          total_abonado_month=total_abonado_month)
 
 
 @bp.route("/nueva", methods=["GET", "POST"])
@@ -272,20 +258,6 @@ def detail(bill_id):
         ORDER BY pe.name
     """, (bill_id,))
 
-    payments = db.query("""
-        SELECT hp.*, pe.name AS person_name, a.name AS account_name
-        FROM household_bill_payments hp
-        LEFT JOIN people pe ON pe.id = hp.person_id
-        LEFT JOIN accounts a ON a.id = hp.account_id
-        WHERE hp.bill_id = ?
-        ORDER BY hp.date DESC, hp.id DESC
-    """, (bill_id,))
-
-    accounts = db.query("""SELECT a.*, b.name AS bank_name FROM accounts a
-                           LEFT JOIN banks b ON b.id=a.bank_id
-                           WHERE a.status='activa' ORDER BY a.name""")
-
-    # Otras cuotas de la misma compra (serie)
     series = []
     if bill.get("series_id"):
         series = db.query("""
@@ -296,16 +268,11 @@ def detail(bill_id):
     bill = dict(bill)
     bill["participants_count"] = len(participants)
     bill["sum_shares"] = sum(p["share_amount"] or 0 for p in participants)
-    bill["sum_paid"] = sum(p["paid_amount"] or 0 for p in participants)
-    por_cobrar, abonado, pendiente = _bill_collection(bill)
-    bill["por_cobrar"] = por_cobrar
-    bill["abonado"] = abonado
-    bill["pendiente"] = pendiente
+    bill["por_cobrar"] = _por_cobrar(bill)
     bill["amount_paid_by_me"] = bill["amount"] if not bill["paid_by_person_id"] else 0
 
     return render_template("household_detail.html", bill=bill,
-                          participants=participants, accounts=accounts,
-                          payments=payments, series=series)
+                          participants=participants, series=series)
 
 
 @bp.route("/<int:bill_id>/editar", methods=["GET", "POST"])
@@ -341,12 +308,10 @@ def edit(bill_id):
         db.update("household_bills", data, "id = ?", (bill_id,))
         db.audit("update", "household_bill", bill_id, data)
 
-        # Recrear participantes
         db.delete("household_bill_participants", "bill_id = ?", (bill_id,))
         person_ids = request.form.getlist("participant_ids[]")
         shares = request.form.getlist("participant_shares[]")
         _create_participants(bill_id, amount, split, person_ids, shares)
-        _recalc_bill_status(bill_id)
         flash("Cuenta actualizada", "success")
         return redirect(url_for("household.detail", bill_id=bill_id))
 
@@ -358,83 +323,46 @@ def edit(bill_id):
 
 @bp.route("/<int:bill_id>/marcar-pagada", methods=["POST"])
 def mark_paid(bill_id):
+    """Marca la cuenta como pagada SIN moverla de mes (se conserva el historial)."""
     bill = db.query("SELECT * FROM household_bills WHERE id = ?", (bill_id,), one=True)
     if not bill:
         flash("Cuenta no encontrada", "error")
         return redirect(url_for("household.index"))
+    db.update("household_bills", {
+        "status": "pagada",
+        "paid_date": today_iso(),
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }, "id = ?", (bill_id,))
     db.audit("payment", "household_bill", bill_id)
-
-    if bill["is_recurring"]:
-        # Cuenta recurrente: avanza al próximo mes (siempre la misma, vence el día N)
-        from modules.helpers import add_months, parse_date_cl
-        base = parse_date_cl(bill["due_date"]) or date.today()
-        nxt = add_months(base, 1)
-        day = bill["recurring_day"] or 5
-        try:
-            nxt = nxt.replace(day=min(int(day), 28))
-        except (ValueError, TypeError):
-            pass
-        db.update("household_bills", {
-            "status": "pendiente",
-            "due_date": nxt.isoformat(),
-            "paid_date": None,
-            "collected_amount": 0,
-            "updated_at": datetime.now().isoformat(timespec="seconds"),
-        }, "id = ?", (bill_id,))
-        db.update("household_bill_participants",
-                  {"paid_amount": 0, "status": "pendiente"}, "bill_id = ?", (bill_id,))
-        flash(f"Pagada. Próximo vencimiento: {nxt.strftime('%d/%m/%Y')}", "success")
-    else:
-        db.update("household_bills", {
-            "status": "pagada",
-            "paid_date": today_iso(),
-            "updated_at": datetime.now().isoformat(timespec="seconds"),
-        }, "id = ?", (bill_id,))
-        flash("Cuenta marcada como pagada", "success")
-    return redirect(url_for("household.detail", bill_id=bill_id))
+    flash("Cuenta marcada como pagada", "success")
+    return redirect(request.referrer or url_for("household.index"))
 
 
-def _apply_abono(bill_id, amount, the_date, account_id, participant_id=None, person_id=None):
-    """Registra un abono: historial, participante (si aplica), cuenta y estado."""
+@bp.route("/abono", methods=["POST"])
+def add_abono():
+    """Registra un abono a nivel de MES (no de una cuenta puntual).
+
+    Permite ir cargando pagos parciales (50k, 30k, ...) que llegan de a poco.
+    """
+    ym = safe_str(request.form.get("ym"))
+    amount = parse_money(request.form.get("amount"))
+    the_date = safe_str(request.form.get("date")) or today_iso()
+    person_id = safe_int(request.form.get("person_id")) or None
+    account_id = safe_int(request.form.get("account_id")) or None
+    notes = safe_str(request.form.get("notes")) or None
+
+    if not ym:
+        d = parse_date_cl(the_date) or date.today()
+        ym = f"{d.year}-{d.month:02d}"
     if amount <= 0:
-        return
-    # Si abona un participante, sumar a su pagado
-    if participant_id:
-        part = db.query("SELECT * FROM household_bill_participants WHERE id=?",
-                        (participant_id,), one=True)
-        if part:
-            new_paid = (part["paid_amount"] or 0) + amount
-            if new_paid >= (part["share_amount"] or 0):
-                p_status = "pagado"
-            elif new_paid > 0:
-                p_status = "parcial"
-            else:
-                p_status = "pendiente"
-            db.update("household_bill_participants",
-                      {"paid_amount": new_paid, "status": p_status},
-                      "id = ?", (participant_id,))
-            person_id = person_id or part["person_id"]
+        flash("El monto del abono debe ser mayor a 0", "error")
+        return redirect(request.referrer or url_for("household.index"))
 
-    # Acumulado a nivel de cuenta (fuente única para cuentas sin participantes)
-    db.execute("UPDATE household_bills SET collected_amount = COALESCE(collected_amount,0) + ? WHERE id = ?",
-               (amount, bill_id))
-
-    # Historial del abono
-    db.insert("household_bill_payments", {
-        "bill_id": bill_id,
-        "participant_id": participant_id,
-        "person_id": person_id,
-        "amount": amount,
-        "date": the_date,
-        "account_id": account_id,
-        "notes": None,
-    })
-
-    # Si me lo depositan en una cuenta, sumarlo al saldo + registrar ingreso
+    tx_id = None
     if account_id:
         db.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?",
                    (amount, account_id))
-        db.insert("transactions", {
+        tx_id = db.insert("transactions", {
             "date": the_date, "amount": amount, "type": "income",
             "transaction_type": "normal",
             "description": "Abono cuenta del hogar",
@@ -442,54 +370,31 @@ def _apply_abono(bill_id, amount, the_date, account_id, participant_id=None, per
             "status": "pagado", "origin": "web",
         })
 
-    db.audit("payment", "household_bill", bill_id, {"amount": amount})
-    _recalc_bill_status(bill_id)
-
-
-@bp.route("/participante/<int:participant_id>/abonar", methods=["POST"])
-def participant_payment(participant_id):
-    """Registrar abono de un participante."""
-    p = db.query("SELECT * FROM household_bill_participants WHERE id = ?",
-                 (participant_id,), one=True)
-    if not p:
-        flash("Participante no encontrado", "error")
-        return redirect(url_for("household.index"))
-    amount = parse_money(request.form.get("amount"))
-    the_date = safe_str(request.form.get("date")) or today_iso()
-    account_id = safe_int(request.form.get("account_id")) or None
-    _apply_abono(p["bill_id"], amount, the_date, account_id,
-                 participant_id=participant_id, person_id=p["person_id"])
+    new_id = db.insert("household_payments", {
+        "ym": ym, "person_id": person_id, "amount": amount,
+        "date": the_date, "account_id": account_id, "tx_id": tx_id, "notes": notes,
+    })
+    db.audit("payment", "household_payment", new_id, {"amount": amount, "ym": ym})
     flash(f"Abono de ${amount:,.0f} registrado".replace(",", "."), "success")
-    return redirect(url_for("household.detail", bill_id=p["bill_id"]))
+    return redirect(request.referrer or url_for("household.index"))
 
 
-@bp.route("/<int:bill_id>/abonar", methods=["POST"])
-def bill_payment(bill_id):
-    """Registrar un abono directamente sobre la cuenta (sin elegir participante)."""
-    bill = db.query("SELECT * FROM household_bills WHERE id = ?", (bill_id,), one=True)
-    if not bill:
-        flash("Cuenta no encontrada", "error")
+@bp.route("/abono/<int:payment_id>/eliminar", methods=["POST"])
+def delete_abono(payment_id):
+    pay = db.query("SELECT * FROM household_payments WHERE id = ?", (payment_id,), one=True)
+    if not pay:
+        flash("Abono no encontrado", "error")
         return redirect(url_for("household.index"))
-    amount = parse_money(request.form.get("amount"))
-    the_date = safe_str(request.form.get("date")) or today_iso()
-    account_id = safe_int(request.form.get("account_id")) or None
-    person_id = safe_int(request.form.get("person_id")) or None
-
-    # Si hay un único participante, atribuir el abono a él automáticamente.
-    participant_id = None
-    parts = db.query("SELECT * FROM household_bill_participants WHERE bill_id=?", (bill_id,))
-    if person_id:
-        match = next((x for x in parts if x["person_id"] == person_id), None)
-        if match:
-            participant_id = match["id"]
-    elif len(parts) == 1:
-        participant_id = parts[0]["id"]
-        person_id = parts[0]["person_id"]
-
-    _apply_abono(bill_id, amount, the_date, account_id,
-                 participant_id=participant_id, person_id=person_id)
-    flash(f"Abono de ${amount:,.0f} registrado".replace(",", "."), "success")
-    return redirect(url_for("household.detail", bill_id=bill_id))
+    # Revertir el ingreso en la cuenta, si lo hubo
+    if pay["account_id"]:
+        db.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?",
+                   (pay["amount"], pay["account_id"]))
+    if pay["tx_id"]:
+        db.delete("transactions", "id = ?", (pay["tx_id"],))
+    db.delete("household_payments", "id = ?", (payment_id,))
+    db.audit("delete", "household_payment", payment_id)
+    flash("Abono eliminado", "info")
+    return redirect(request.referrer or url_for("household.index"))
 
 
 @bp.route("/<int:bill_id>/eliminar", methods=["POST"])
