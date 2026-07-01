@@ -36,6 +36,23 @@ def index():
         ORDER BY r.active DESC, r.day_of_month ASC, r.name ASC
     """)
 
+    # ¿Qué recurrentes ya se pagaron en el mes en curso? Se determina por la
+    # transacción enlazada (recurring_id) del mes actual; así el estado se
+    # reinicia solo cada mes.
+    ym_now = date.today().strftime("%Y-%m")
+    paid_rows = db.query("""
+        SELECT recurring_id, MAX(id) AS tx_id
+        FROM transactions
+        WHERE recurring_id IS NOT NULL AND status='pagado'
+              AND strftime('%Y-%m', date) = ?
+        GROUP BY recurring_id
+    """, (ym_now,))
+    paid_map = {r["recurring_id"]: r["tx_id"] for r in paid_rows}
+    for p in payments:
+        # Compatibilidad: pagos antiguos sin enlace usan last_paid_month.
+        p["paid_this_month"] = (p["id"] in paid_map) or (p.get("last_paid_month") == ym_now)
+        p["paid_tx_id"] = paid_map.get(p["id"])
+
     today_day = date.today().day
     active = [p for p in payments if p["active"]]
     total_month = sum(p["amount"] for p in active if p["frequency"] == "monthly")
@@ -180,9 +197,21 @@ def register_payment(payment_id):
         flash("Pago no encontrado", "error")
         return redirect(url_for("recurring.index"))
 
+    the_date = safe_str(request.form.get("date")) or today_iso()
+    ym = the_date[:7]
+    # Evita marcar dos veces el mismo mes (doble descuento por error).
+    already = db.query("""
+        SELECT id FROM transactions
+        WHERE recurring_id = ? AND status='pagado'
+              AND strftime('%Y-%m', date) = ?
+    """, (payment_id, ym), one=True)
+    if already:
+        flash(f"'{p['name']}' ya está marcado como pagado este mes", "info")
+        return redirect(url_for("recurring.index"))
+
     amount = parse_money(request.form.get("amount")) or p["amount"]
     tx_data = {
-        "date": safe_str(request.form.get("date")) or today_iso(),
+        "date": the_date,
         "amount": amount,
         "type": "expense",
         "transaction_type": "normal",
@@ -193,6 +222,7 @@ def register_payment(payment_id):
         "person_id": p["person_id"],
         "status": "pagado",
         "origin": "web",
+        "recurring_id": payment_id,
     }
     new_tx = db.insert("transactions", tx_data)
     db.audit("create", "transaction", new_tx,
@@ -223,10 +253,63 @@ def register_payment(payment_id):
             "status": "pendiente",
         })
 
-    db.update("recurring_payments",
-              {"last_paid_month": (safe_str(request.form.get("date")) or today_iso())[:7]},
-              "id = ?", (payment_id,))
+    db.update("recurring_payments", {"last_paid_month": ym}, "id = ?", (payment_id,))
     flash("Pago registrado" + (" · cuenta por cobrar creada" if (p["is_reimbursable"] and p["person_id"]) else ""), "success")
+    return redirect(url_for("recurring.index"))
+
+
+@bp.route("/<int:payment_id>/cancelar-pago", methods=["POST"])
+def cancel_payment(payment_id):
+    """Revierte el pago del mes en curso: elimina la transacción, devuelve el
+    saldo a la cuenta (o el cupo a la tarjeta) y quita la cuenta por cobrar
+    asociada si aún no tiene abonos. Útil si se marcó por error."""
+    p = db.query("SELECT * FROM recurring_payments WHERE id = ?",
+                 (payment_id,), one=True)
+    if not p:
+        flash("Pago no encontrado", "error")
+        return redirect(url_for("recurring.index"))
+
+    ym = date.today().strftime("%Y-%m")
+    tx = db.query("""
+        SELECT * FROM transactions
+        WHERE recurring_id = ? AND status='pagado'
+              AND strftime('%Y-%m', date) = ?
+        ORDER BY id DESC LIMIT 1
+    """, (payment_id, ym), one=True)
+
+    if not tx:
+        # No hay transacción enlazada (p. ej. pago antiguo): solo limpiar marca.
+        if p.get("last_paid_month") == ym:
+            db.update("recurring_payments", {"last_paid_month": None},
+                      "id = ?", (payment_id,))
+            flash("Pago desmarcado", "info")
+        else:
+            flash("Este pago no está marcado como pagado este mes", "info")
+        return redirect(url_for("recurring.index"))
+
+    # Revertir el efecto en la cuenta / tarjeta
+    if tx["account_id"]:
+        db.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?",
+                   (tx["amount"], tx["account_id"]))
+    if tx["card_id"]:
+        db.execute("UPDATE credit_cards SET used_amount = used_amount - ? WHERE id = ?",
+                   (tx["amount"], tx["card_id"]))
+
+    # Quitar la cuenta por cobrar generada si sigue intacta (sin abonos)
+    if p["is_reimbursable"] and p["person_id"]:
+        db.delete("person_debts",
+                  "related_transaction_id = ? AND paid_amount = 0",
+                  (tx["id"],))
+
+    db.delete("transactions", "id = ?", (tx["id"],))
+    db.audit("delete", "transaction", tx["id"], {"cancel_recurring": payment_id})
+
+    # Si el último mes pagado era este, limpiar la marca
+    if p.get("last_paid_month") == ym:
+        db.update("recurring_payments", {"last_paid_month": None},
+                  "id = ?", (payment_id,))
+
+    flash(f"Pago de '{p['name']}' cancelado · saldo devuelto", "success")
     return redirect(url_for("recurring.index"))
 
 

@@ -54,15 +54,27 @@
                     <div class="font-medium">{{ r.name }}</div>
                 </div>
             </td>
-            <td class="text-xs capitalize">{{ r.frequency }}</td>
+            <td>
+                {% if r.paid_this_month %}
+                    <span class="badge badge-green">✅ Pagado</span>
+                {% else %}
+                    <span class="badge badge-yellow">Pendiente</span>
+                {% endif %}
+            </td>
             <td class="text-sm num">{{ r.day_of_month or '—' }}</td>
             <td class="text-xs text-slate-500">{{ r.account_name or r.card_name or '—' }}</td>
             <td class="text-right font-semibold num">{{ r.amount | clp }}</td>
             <td>
                 <div class="flex justify-end gap-1">
-                    <form action="/recurrentes/{{ r.id }}/registrar-pago" method="POST" data-confirm="¿Registrar el pago de '{{ r.name }}' por {{ r.amount | clp }}?">
-                        <button type="submit" class="btn-ghost p-1.5 text-base leading-none" title="Registrar pago de este mes">✅</button>
+                    {% if r.paid_this_month %}
+                    <form action="/recurrentes/{{ r.id }}/cancelar-pago" method="POST" data-confirm="¿Cancelar el pago de '{{ r.name }}' de este mes? Se devolverá el saldo a la cuenta.">
+                        <button type="submit" class="btn-ghost p-1.5 text-base leading-none" title="Cancelar pago de este mes (devolver saldo)">❌</button>
                     </form>
+                    {% else %}
+                    <form action="/recurrentes/{{ r.id }}/registrar-pago" method="POST" data-confirm="¿Registrar el pago de '{{ r.name }}' por {{ r.amount | clp }}?">
+                        <button type="submit" class="btn-ghost p-1.5 text-base leading-none" title="Marcar pagado este mes">✅</button>
+                    </form>
+                    {% endif %}
                     <a href="/recurrentes/{{ r.id }}/editar" class="btn-ghost p-1.5 text-base leading-none" title="Editar">✏️</a>
                     <form action="/recurrentes/{{ r.id }}/eliminar" method="POST" data-confirm="¿Eliminar este pago recurrente?">
                         <button type="submit" class="btn-ghost p-1.5 text-base leading-none" title="Eliminar">🗑️</button>
@@ -92,7 +104,7 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th></th><th>Nombre</th><th>Frecuencia</th><th>Día</th>
+                            <th></th><th>Nombre</th><th>Estado</th><th>Día</th>
                             <th>Paga con</th><th class="text-right">Monto</th><th></th>
                         </tr>
                     </thead>
