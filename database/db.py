@@ -48,6 +48,8 @@ def init_db(app) -> None:
 # esta migración añade columnas que falten de forma idempotente y segura.
 MIGRATIONS = [
     # (tabla, columna, definición)
+    # Categorías: distinguir si aplican a gastos o ingresos ('expense'/'income')
+    ("categories", "kind", "TEXT NOT NULL DEFAULT 'expense'"),
     ("banks", "logo_path", "TEXT"),
     ("credit_cards", "logo_path", "TEXT"),
     ("loans", "payment_day", "INTEGER"),

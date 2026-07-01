@@ -7,7 +7,8 @@ from flask import (Blueprint, render_template, request, redirect, url_for,
 from werkzeug.utils import secure_filename
 from database import db
 from modules.helpers import (
-    safe_str, safe_float, safe_int, parse_money, today_iso, parse_date_cl
+    safe_str, safe_float, safe_int, parse_money, today_iso, parse_date_cl,
+    icon_emoji
 )
 from modules.cards import create_installments
 
@@ -44,6 +45,17 @@ STATUSES = [
 
 def _allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _categories_json(categories):
+    """Serializa las categorías con su tipo (kind) y emoji para que el
+    formulario pueda mostrar solo las de gasto o solo las de ingreso."""
+    return [{
+        "id": c["id"],
+        "name": c["name"],
+        "kind": (c.get("kind") if isinstance(c, dict) else c["kind"]) or "expense",
+        "emoji": icon_emoji(c["icon"]),
+    } for c in categories]
 
 
 def _payment_options():
@@ -310,9 +322,14 @@ def create():
         flash("Movimiento registrado" + shared_msg, "success")
         return redirect(url_for("transactions.index"))
 
+    default_type = safe_str(request.args.get("type")) or "expense"
+    if default_type not in ("expense", "income", "transfer"):
+        default_type = "expense"
     return render_template("transactions_form.html",
                            tx=None,
                            categories=categories,
+                           categories_json=_categories_json(categories),
+                           default_type=default_type,
                            accounts=accounts,
                            cards=cards,
                            people=people,
@@ -367,6 +384,8 @@ def edit(tx_id):
     return render_template("transactions_form.html",
                            tx=tx,
                            categories=categories,
+                           categories_json=_categories_json(categories),
+                           default_type=tx["type"] or "expense",
                            accounts=accounts,
                            cards=cards,
                            people=people,

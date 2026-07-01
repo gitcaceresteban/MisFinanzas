@@ -34,7 +34,7 @@ def health():
 @require_token
 def info():
     return jsonify({
-        "name": "Motor Financiero Personal",
+        "name": "Mis Finanzas · RNRJ",
         "version": "1.0.0",
         "endpoints": [
             "GET  /api/health",

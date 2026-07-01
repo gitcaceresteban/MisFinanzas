@@ -16,6 +16,18 @@
     <form method="POST" enctype="multipart/form-data" class="card-padded space-y-5"
           x-data="{ shared: {{ 'true' if tx and tx.is_shared else 'false' }}, mode: 'people', rows: [{}],
                     pmOpen: false, pmTarget: '{{ sel.target }}', pmLabel: '{{ sel.label }}', pmLogo: '{{ sel.logo }}',
+                    txType: '{{ (tx.type if tx else default_type) or 'expense' }}',
+                    cats: {{ categories_json | tojson }},
+                    catSel: '{{ tx.category_id if tx and tx.category_id else '' }}',
+                    get filteredCats() {
+                        return this.cats.filter(c => this.txType === 'income'
+                            ? c.kind === 'income' : c.kind !== 'income');
+                    },
+                    onTypeChange() {
+                        if (!this.filteredCats.some(c => String(c.id) === String(this.catSel))) {
+                            this.catSel = '';
+                        }
+                    },
                     get isCard() { return this.pmTarget.startsWith('card:'); },
                     pick(t, l, g) { this.pmTarget = t; this.pmLabel = l; this.pmLogo = g; this.pmOpen = false; } }">
 
@@ -32,10 +44,10 @@
             </div>
             <div>
                 <label class="label">Tipo</label>
-                <select name="type" class="select">
-                    <option value="expense" {% if tx and tx.type == 'expense' %}selected{% elif not tx %}selected{% endif %}>Gasto</option>
-                    <option value="income" {% if tx and tx.type == 'income' %}selected{% endif %}>Ingreso</option>
-                    <option value="transfer" {% if tx and tx.type == 'transfer' %}selected{% endif %}>Transferencia</option>
+                <select name="type" class="select" x-model="txType" @change="onTypeChange()">
+                    <option value="expense">Gasto</option>
+                    <option value="income">Ingreso</option>
+                    <option value="transfer">Transferencia</option>
                 </select>
             </div>
         </div>
@@ -49,13 +61,14 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label class="label">Categoría</label>
-                <select name="category_id" class="select">
+                <label class="label" x-text="txType === 'income' ? 'Categoría de ingreso' : 'Categoría'">Categoría</label>
+                <select name="category_id" class="select" x-model="catSel">
                     <option value="">— Sin categoría —</option>
-                    {% for c in categories %}
-                        <option value="{{ c.id }}" {% if tx and tx.category_id == c.id %}selected{% endif %}>{{ c.icon | emoji }} {{ c.name }}</option>
-                    {% endfor %}
+                    <template x-for="c in filteredCats" :key="c.id">
+                        <option :value="c.id" x-text="c.emoji + ' ' + c.name"></option>
+                    </template>
                 </select>
+                <p class="hint" x-show="txType === 'income'" x-cloak>Estas categorías son solo para ingresos.</p>
             </div>
             <div>
                 <label class="label">Persona (opcional)</label>
