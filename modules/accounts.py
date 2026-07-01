@@ -64,6 +64,47 @@ def create():
                           types=ACCOUNT_TYPES, statuses=ACCOUNT_STATUSES)
 
 
+@bp.route("/<int:account_id>")
+def detail(account_id):
+    """Detalle de una cuenta: saldo + últimos movimientos (gastos e ingresos)."""
+    account = db.query("""
+        SELECT a.*, b.name AS bank_name, b.color AS bank_color, b.logo_path AS bank_logo
+        FROM accounts a
+        LEFT JOIN banks b ON b.id = a.bank_id
+        WHERE a.id = ?
+    """, (account_id,), one=True)
+    if not account:
+        flash("Cuenta no encontrada", "error")
+        return redirect(url_for("accounts.index"))
+
+    transactions = db.query("""
+        SELECT t.*, c.name AS category_name, c.color AS category_color,
+               c.icon AS category_icon, p.name AS person_name
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        LEFT JOIN people p ON p.id = t.person_id
+        WHERE t.account_id = ?
+        ORDER BY t.date DESC, t.id DESC
+        LIMIT 50
+    """, (account_id,))
+
+    # Resumen del mes en curso para esta cuenta
+    from datetime import date
+    ym = date.today().strftime("%Y-%m")
+    month_sums = db.query("""
+        SELECT COALESCE(SUM(CASE WHEN type='expense' THEN amount END), 0) AS expenses,
+               COALESCE(SUM(CASE WHEN type='income' THEN amount END), 0) AS incomes
+        FROM transactions
+        WHERE account_id = ? AND status='pagado' AND strftime('%Y-%m', date) = ?
+    """, (account_id, ym), one=True)
+
+    return render_template("accounts_detail.html",
+                           account=account,
+                           transactions=transactions,
+                           month_expenses=month_sums["expenses"] or 0,
+                           month_incomes=month_sums["incomes"] or 0)
+
+
 @bp.route("/<int:account_id>/editar", methods=["GET", "POST"])
 def edit(account_id):
     account = db.query("SELECT * FROM accounts WHERE id = ?", (account_id,), one=True)

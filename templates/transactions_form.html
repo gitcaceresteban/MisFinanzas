@@ -17,17 +17,6 @@
           x-data="{ shared: {{ 'true' if tx and tx.is_shared else 'false' }}, mode: 'people', rows: [{}],
                     pmOpen: false, pmTarget: '{{ sel.target }}', pmLabel: '{{ sel.label }}', pmLogo: '{{ sel.logo }}',
                     txType: '{{ (tx.type if tx else default_type) or 'expense' }}',
-                    cats: {{ categories_json | tojson }},
-                    catSel: '{{ tx.category_id if tx and tx.category_id else '' }}',
-                    get filteredCats() {
-                        return this.cats.filter(c => this.txType === 'income'
-                            ? c.kind === 'income' : c.kind !== 'income');
-                    },
-                    onTypeChange() {
-                        if (!this.filteredCats.some(c => String(c.id) === String(this.catSel))) {
-                            this.catSel = '';
-                        }
-                    },
                     get isCard() { return this.pmTarget.startsWith('card:'); },
                     pick(t, l, g) { this.pmTarget = t; this.pmLabel = l; this.pmLogo = g; this.pmOpen = false; } }">
 
@@ -44,7 +33,7 @@
             </div>
             <div>
                 <label class="label">Tipo</label>
-                <select name="type" class="select" x-model="txType" @change="onTypeChange()">
+                <select name="type" class="select" x-model="txType">
                     <option value="expense">Gasto</option>
                     <option value="income">Ingreso</option>
                     <option value="transfer">Transferencia</option>
@@ -62,13 +51,22 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="label" x-text="txType === 'income' ? 'Categoría de ingreso' : 'Categoría'">Categoría</label>
-                <select name="category_id" class="select" x-model="catSel">
+                <!-- Dos selects renderizados en el servidor: solo el visible se envía
+                     (el otro queda disabled). Evita inyectar JSON en atributos. -->
+                <select name="category_id" class="select"
+                        x-show="txType !== 'income'" :disabled="txType === 'income'">
                     <option value="">— Sin categoría —</option>
-                    <template x-for="c in filteredCats" :key="c.id">
-                        <option :value="c.id" x-text="c.emoji + ' ' + c.name"></option>
-                    </template>
+                    {% for c in expense_categories %}
+                        <option value="{{ c.id }}" {% if tx and tx.category_id == c.id %}selected{% endif %}>{{ c.icon | emoji }} {{ c.name }}</option>
+                    {% endfor %}
                 </select>
-                <p class="hint" x-show="txType === 'income'" x-cloak>Estas categorías son solo para ingresos.</p>
+                <select name="category_id" class="select" x-cloak
+                        x-show="txType === 'income'" :disabled="txType !== 'income'">
+                    <option value="">— Sin categoría —</option>
+                    {% for c in income_categories %}
+                        <option value="{{ c.id }}" {% if tx and tx.category_id == c.id %}selected{% endif %}>{{ c.icon | emoji }} {{ c.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div>
                 <label class="label">Persona (opcional)</label>
@@ -130,8 +128,9 @@
             </div>
         </div>
 
-        <!-- ============ GASTO COMPARTIDO ============ -->
-        <div class="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <!-- ============ GASTO COMPARTIDO (solo gastos) ============ -->
+        <div class="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+             x-show="txType === 'expense'">
             <label class="flex items-center gap-3 p-4 cursor-pointer bg-slate-50 dark:bg-slate-800/50">
                 <input type="checkbox" name="is_shared" x-model="shared" class="w-4 h-4 rounded">
                 <span class="text-sm font-medium">👥 Gasto compartido (alguien me debe parte)</span>

@@ -22,16 +22,19 @@
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {% for a in accounts %}
             <div class="card-padded bank-stripe" style="--bank-color: {{ a.bank_color or '#64748b' }};">
-                <div class="flex items-start justify-between mb-3">
-                    <div>
-                        <div class="text-base font-semibold">{{ a.name }}</div>
-                        <div class="text-xs text-slate-500 dark:text-slate-400">{{ a.bank_name or 'Sin banco' }}</div>
+                <a href="/cuentas/{{ a.id }}" class="block group">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="text-base font-semibold group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{{ a.name }}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">{{ a.bank_name or 'Sin banco' }}</div>
+                        </div>
+                        <span class="badge badge-{{ a.status | status_color }} capitalize">{{ a.status }}</span>
                     </div>
-                    <span class="badge badge-{{ a.status | status_color }} capitalize">{{ a.status }}</span>
-                </div>
-                <div class="text-2xl font-bold num mb-3 {% if a.balance < 0 %}text-rose-600 dark:text-rose-400{% endif %}">
-                    {{ a.balance | clp }}
-                </div>
+                    <div class="text-2xl font-bold num mb-1 {% if a.balance < 0 %}text-rose-600 dark:text-rose-400{% endif %}">
+                        {{ a.balance | clp }}
+                    </div>
+                    <div class="text-xs text-primary-600 dark:text-primary-400 mb-3 opacity-0 group-hover:opacity-100 transition-opacity">Ver movimientos →</div>
+                </a>
                 <div class="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-4">
                     <span class="capitalize">{{ a.type }} · {{ a.currency }}</span>
                     {% if a.credit_line %}<span>Línea: {{ a.credit_line | clp }}</span>{% endif %}
