@@ -110,9 +110,50 @@ DEFAULT_CATEGORIES = [
     {"name": "Entretenimiento", "color": "#fb7185", "icon": "tv"},
     {"name": "Deudas", "color": "#dc2626", "icon": "trending-down"},
     {"name": "Ahorro", "color": "#16a34a", "icon": "piggy-bank"},
-    {"name": "Ingresos", "color": "#22c55e", "icon": "trending-up"},
     {"name": "Otros", "color": "#64748b", "icon": "more-horizontal"},
 ]
+
+
+# Categorías propias de INGRESOS (separadas de las de gasto).
+DEFAULT_INCOME_CATEGORIES = [
+    {"name": "Sueldo", "color": "#22c55e", "icon": "briefcase"},
+    {"name": "Honorarios", "color": "#14b8a6", "icon": "banknote"},
+    {"name": "Arriendo recibido", "color": "#10b981", "icon": "home"},
+    {"name": "Reembolsos", "color": "#06b6d4", "icon": "repeat"},
+    {"name": "Inversiones", "color": "#8b5cf6", "icon": "trending-up"},
+    {"name": "Bonos", "color": "#f59e0b", "icon": "gift"},
+    {"name": "Ventas", "color": "#f97316", "icon": "shopping-cart"},
+    {"name": "Otros ingresos", "color": "#64748b", "icon": "dollar-sign"},
+]
+
+
+def ensure_income_categories(conn) -> None:
+    """Garantiza que existan las categorías de ingreso y que estén marcadas
+    con kind='income'. Es idempotente: sirve tanto para BD nuevas como para
+    las ya creadas (donde el seed inicial no vuelve a correr)."""
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(categories)")]
+    if "kind" not in cols:
+        return  # la migración aún no añadió la columna
+
+    # La antigua categoría genérica "Ingresos" pasa a ser de tipo income.
+    conn.execute("UPDATE categories SET kind='income' WHERE lower(name)='ingresos'")
+
+    existing = {r["name"].strip().lower()
+                for r in conn.execute("SELECT name FROM categories")}
+    base = conn.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) AS m FROM categories"
+    ).fetchone()["m"] or 0
+
+    for i, c in enumerate(DEFAULT_INCOME_CATEGORIES):
+        if c["name"].strip().lower() in existing:
+            conn.execute("UPDATE categories SET kind='income' WHERE lower(name)=?",
+                         (c["name"].strip().lower(),))
+            continue
+        conn.execute(
+            """INSERT INTO categories (name, color, icon, sort_order, kind)
+               VALUES (?, ?, ?, ?, 'income')""",
+            (c["name"], c["color"], c["icon"], base + i + 1),
+        )
 
 
 def seed_initial_data(app) -> None:
@@ -153,6 +194,9 @@ def seed_initial_data(app) -> None:
                        VALUES (?, ?, ?, ?)""",
                     (c["name"], c["color"], c["icon"], i),
                 )
+
+        # Asegurar categorías de ingreso (idempotente, también para BD viejas)
+        ensure_income_categories(conn)
 
         # Settings por defecto
         cur = conn.execute("SELECT COUNT(*) as c FROM settings")

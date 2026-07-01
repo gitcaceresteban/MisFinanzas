@@ -30,14 +30,14 @@
                        class="input ml-2 w-auto text-sm">
             </div>
             <div class="flex items-center gap-2">
-                {% if missing_fixed %}
                 <form method="POST" action="/hogar/generar-fijas">
                     <input type="hidden" name="ym" value="{{ ym }}">
-                    <button type="submit" class="btn-secondary text-sm" title="Crear {{ missing_fixed | join(', ') }}">
+                    <button type="submit" class="btn-secondary text-sm relative"
+                            title="{% if missing_fixed %}Crear {{ missing_fixed | join(', ') }}{% else %}Regenerar las cuentas fijas que falten en este mes{% endif %}">
                         <i data-lucide="repeat" class="w-4 h-4"></i> Generar cuentas fijas
+                        {% if missing_fixed %}<span class="ml-1 inline-flex items-center justify-center text-[10px] font-bold rounded-full bg-primary-500 text-white w-4 h-4">{{ missing_fixed | length }}</span>{% endif %}
                     </button>
                 </form>
-                {% endif %}
                 <button type="button" @click="showAbono = !showAbono" class="btn-primary text-sm">
                     <i data-lucide="plus" class="w-4 h-4"></i> Añadir abono
                 </button>

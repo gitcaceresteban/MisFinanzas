@@ -8,9 +8,12 @@ import subprocess
 from datetime import datetime
 from openai import OpenAI
 
-BASE_DIR = "/home/caceresteban/Aplicaciones/motor-financiero"
-DB_PATH = f"{BASE_DIR}/database/finance.db"
-ADD_SCRIPT = f"{BASE_DIR}/scripts/add_transaction.py"
+BASE_DIR = os.getenv("MOTOR_FINANCIERO_DIR",
+                     "/home/caceresteban/Aplicaciones/motor-financiero")
+DB_PATH = os.getenv("FINANCE_DB_PATH", f"{BASE_DIR}/database/finance.db")
+# El script de inserción vive junto a este archivo.
+ADD_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "add_transaction.py")
 
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 

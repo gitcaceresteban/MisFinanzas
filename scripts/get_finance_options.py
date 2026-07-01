@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
+import os
 import sqlite3
 import json
 
-DB_PATH = "/home/caceresteban/Aplicaciones/motor-financiero/database/finance.db"
+DB_PATH = os.getenv(
+    "FINANCE_DB_PATH",
+    "/home/caceresteban/Aplicaciones/motor-financiero/database/finance.db",
+)
 
 def fetch_all(cur, query):
     cur.execute(query)

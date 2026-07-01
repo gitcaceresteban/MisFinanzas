@@ -60,13 +60,27 @@ def index():
     """)
     for c in cards:
         d_iso = _next_day_with(c["payment_day"], today, end_date)
-        if d_iso and d_iso in days_data:
-            days_data[d_iso]["outflows"] += c["billed_amount"]
-            days_data[d_iso]["events"].append({
-                "kind": "card",
-                "title": f"Pago tarjeta {c['name']}",
-                "amount": -c["billed_amount"],
-            })
+        if not d_iso or d_iso not in days_data:
+            continue
+        # Si el facturado ya se pagó (total o parcialmente) en el mismo mes en
+        # que se proyecta el vencimiento, no lo contamos de nuevo: solo el resto.
+        # Así, si pagas por adelantado, deja de aparecer como flujo futuro.
+        proj_month = d_iso[:7]
+        paid = db.query("""
+            SELECT COALESCE(SUM(amount), 0) AS t FROM transactions
+            WHERE card_id = ? AND type = 'expense' AND status = 'pagado'
+                  AND transaction_type = 'debt_payment'
+                  AND strftime('%Y-%m', date) = ?
+        """, (c["id"], proj_month), one=True)["t"] or 0
+        remaining = max(0, (c["billed_amount"] or 0) - paid)
+        if remaining <= 0:
+            continue
+        days_data[d_iso]["outflows"] += remaining
+        days_data[d_iso]["events"].append({
+            "kind": "card",
+            "title": f"Pago tarjeta {c['name']}",
+            "amount": -remaining,
+        })
 
     # 2) Cuotas de tarjetas estimadas
     inst_card = db.query("""

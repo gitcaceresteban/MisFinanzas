@@ -1,5 +1,5 @@
 """
-Motor Financiero Personal - Aplicación principal Flask.
+Mis Finanzas (RNRJ) - Aplicación principal Flask.
 Diseñada para correr 24/7 en Raspberry Pi en red local.
 """
 import os
@@ -53,7 +53,7 @@ def create_app() -> Flask:
             # 'today' en ISO (YYYY-MM-DD) para usar como valor por defecto
             # en <input type="date"> de los formularios.
             "today": date.today().isoformat(),
-            "app_name": "Motor Financiero",
+            "app_name": "Mis Finanzas",
             "app_version": "1.0.0",
         }
 
@@ -121,7 +121,7 @@ if __name__ == "__main__":
     app = create_app()
     print("")
     print("=" * 56)
-    print("  Motor Financiero Personal")
+    print("  Mis Finanzas · RNRJ 🐒")
     print("=" * 56)
     print(f"  Servidor:  http://{app.config['HOST']}:{app.config['PORT']}")
     print(f"  Base:      {app.config['DATABASE_PATH']}")
