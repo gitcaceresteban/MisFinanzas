@@ -61,6 +61,9 @@ MIGRATIONS = [
     ("recurring_payments", "group_name", "TEXT"),
     ("transactions", "is_shared", "INTEGER NOT NULL DEFAULT 0"),
     ("transactions", "my_share", "REAL"),
+    # Enlaza una transacción con el pago recurrente que la originó (para poder
+    # saber qué recurrente se pagó este mes y revertirlo si se cancela).
+    ("transactions", "recurring_id", "INTEGER"),
     ("person_debts", "paid_to_account_id", "INTEGER"),
     ("household_bills", "is_recurring", "INTEGER NOT NULL DEFAULT 0"),
     ("household_bills", "recurring_day", "INTEGER"),
