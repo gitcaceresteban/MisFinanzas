@@ -129,6 +129,7 @@ Reglas:
 - is_shared: 1 si hay división con otra persona; si no, 0.
 - my_share: si no se divide, igual al Monto. Si se divide en partes iguales entre 2, usar la mitad.
 - No inventes IDs.
+- El mensaje puede venir con algunas siglas, por ejemplo BF significa Banco Falabella, CC cuenta corriente, Banchile es Banco de Chile, CMR es la tarjeta de credito CMR
 """
 
 
