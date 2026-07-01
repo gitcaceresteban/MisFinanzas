@@ -23,14 +23,22 @@
     <!-- KPI Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
-        <a href="/cuentas/" class="stat-card card-hover">
+        <div class="stat-card" x-data="saldoFilter()">
             <div class="flex items-start justify-between mb-2">
                 <div class="stat-label">Saldo total</div>
-                <div class="stat-icon bg-emerald-100 dark:bg-emerald-500/15">💰</div>
+                <a href="/cuentas/" class="stat-icon bg-emerald-100 dark:bg-emerald-500/15" title="Ver cuentas">💰</a>
             </div>
-            <div class="stat-value">{{ total_balance | clp }}</div>
-            <div class="stat-sub">{{ accounts | length }} cuenta(s)</div>
-        </a>
+            <div class="stat-value" x-text="fmt(cur)">{{ total_balance | clp }}</div>
+            <div class="stat-sub"><a href="/cuentas/" class="hover:underline">{{ accounts | length }} cuenta(s) →</a></div>
+            {% if accounts %}
+            <select x-model="sel" class="select mt-2 text-xs py-1.5">
+                <option value="all">Todas las cuentas</option>
+                <template x-for="a in accounts" :key="a.id">
+                    <option :value="a.id" x-text="a.name"></option>
+                </template>
+            </select>
+            {% endif %}
+        </div>
 
         <div class="stat-card" x-data="cupoFilter()">
             <div class="flex items-start justify-between mb-2">
@@ -460,6 +468,22 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script>
+    // Filtro de saldo total por cuenta (card del dashboard)
+    window.__saldoAccounts = {{ accounts_json | tojson }};
+    window.__saldoAll = {{ total_balance or 0 }};
+    function saldoFilter() {
+        return {
+            accounts: window.__saldoAccounts || [],
+            sel: 'all',
+            get cur() {
+                if (this.sel === 'all') return window.__saldoAll;
+                const a = this.accounts.find(x => String(x.id) === String(this.sel));
+                return a ? a.balance : window.__saldoAll;
+            },
+            fmt(n) { return window.fmtCLP ? window.fmtCLP(n) : n; }
+        };
+    }
+
     // Filtro de cupo disponible por tarjeta (card del dashboard)
     window.__cupoCards = {{ cards_json | tojson }};
     window.__cupoAll = { available: {{ total_cards_available or 0 }}, used: {{ total_cards_used or 0 }}, limit: {{ total_cards_limit or 0 }} };

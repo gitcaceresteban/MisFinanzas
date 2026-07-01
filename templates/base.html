@@ -34,13 +34,12 @@
 
 <div x-data="{ sidebar: false }"
      @keydown.escape.window="sidebar = false"
-     @resize.window="if (window.innerWidth >= 1024) sidebar = false"
      class="flex min-h-screen">
 
     {% include 'partials/sidebar.html' %}
 
-    <!-- Contenido principal -->
-    <div class="flex-1 flex flex-col min-w-0 lg:ml-72">
+    <!-- Contenido principal (el sidebar es overlay: siempre oculto hasta abrirlo) -->
+    <div class="flex-1 flex flex-col min-w-0">
 
         {% include 'partials/topbar.html' %}
 

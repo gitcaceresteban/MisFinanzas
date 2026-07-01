@@ -7,8 +7,7 @@ from flask import (Blueprint, render_template, request, redirect, url_for,
 from werkzeug.utils import secure_filename
 from database import db
 from modules.helpers import (
-    safe_str, safe_float, safe_int, parse_money, today_iso, parse_date_cl,
-    icon_emoji
+    safe_str, safe_float, safe_int, parse_money, today_iso, parse_date_cl
 )
 from modules.cards import create_installments
 
@@ -47,15 +46,12 @@ def _allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def _categories_json(categories):
-    """Serializa las categorías con su tipo (kind) y emoji para que el
-    formulario pueda mostrar solo las de gasto o solo las de ingreso."""
-    return [{
-        "id": c["id"],
-        "name": c["name"],
-        "kind": (c.get("kind") if isinstance(c, dict) else c["kind"]) or "expense",
-        "emoji": icon_emoji(c["icon"]),
-    } for c in categories]
+def _categories_split():
+    """Categorías activas separadas por tipo: (gasto, ingreso)."""
+    cats = db.query("SELECT * FROM categories WHERE active=1 ORDER BY name")
+    expense = [c for c in cats if (c.get("kind") or "expense") != "income"]
+    income = [c for c in cats if (c.get("kind") or "expense") == "income"]
+    return expense, income
 
 
 def _payment_options():
@@ -245,7 +241,11 @@ def index():
 
 @bp.route("/nuevo", methods=["GET", "POST"])
 def create():
-    categories = db.query("SELECT * FROM categories WHERE active=1 ORDER BY name")
+    # Los ingresos tienen su propia página, más simple y clara
+    if request.method == "GET" and safe_str(request.args.get("type")) == "income":
+        return redirect(url_for("incomes.create"))
+
+    expense_categories, income_categories = _categories_split()
     accounts, cards = _payment_options()
     people = db.query("SELECT * FROM people WHERE active=1 ORDER BY name")
 
@@ -327,8 +327,8 @@ def create():
         default_type = "expense"
     return render_template("transactions_form.html",
                            tx=None,
-                           categories=categories,
-                           categories_json=_categories_json(categories),
+                           expense_categories=expense_categories,
+                           income_categories=income_categories,
                            default_type=default_type,
                            accounts=accounts,
                            cards=cards,
@@ -345,7 +345,7 @@ def edit(tx_id):
         flash("Movimiento no encontrado", "error")
         return redirect(url_for("transactions.index"))
 
-    categories = db.query("SELECT * FROM categories WHERE active=1 ORDER BY name")
+    expense_categories, income_categories = _categories_split()
     accounts, cards = _payment_options()
     people = db.query("SELECT * FROM people WHERE active=1 ORDER BY name")
 
@@ -383,8 +383,8 @@ def edit(tx_id):
 
     return render_template("transactions_form.html",
                            tx=tx,
-                           categories=categories,
-                           categories_json=_categories_json(categories),
+                           expense_categories=expense_categories,
+                           income_categories=income_categories,
                            default_type=tx["type"] or "expense",
                            accounts=accounts,
                            cards=cards,

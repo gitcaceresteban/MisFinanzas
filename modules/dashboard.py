@@ -141,6 +141,11 @@ def index():
         "limit": c["credit_limit"] or 0,
     } for c in cards]
 
+    # Ídem para el filtro de "saldo total" por cuenta (solo cuentas, no tarjetas)
+    accounts_json = [{
+        "id": a["id"], "name": a["name"], "balance": a["balance"] or 0,
+    } for a in accounts]
+
     # ----- Gastos del mes -----
     month_expenses = db.query("""
         SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
@@ -363,6 +368,7 @@ def index():
         accounts=accounts,
         cards=cards,
         cards_json=cards_json,
+        accounts_json=accounts_json,
         debt=debt,
         total_debt=debt["total"],
         monthly_income=monthly_income,
