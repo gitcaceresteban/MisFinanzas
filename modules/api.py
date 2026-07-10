@@ -6,6 +6,7 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, current_app
 from database import db
 from modules.helpers import safe_str, safe_float, safe_int, today_iso
+from modules.cards import recompute_card_billing
 
 bp = Blueprint("api", __name__)
 
@@ -159,6 +160,8 @@ def gastos_create():
             "UPDATE credit_cards SET used_amount = used_amount + ? WHERE id = ?",
             (tx["amount"], tx["card_id"])
         )
+    if tx["card_id"]:
+        recompute_card_billing(tx["card_id"])
 
     return jsonify({"id": new_id, "status": "created"}), 201
 
@@ -190,6 +193,9 @@ def gastos_update(tx_id):
 
     db.update("transactions", update_data, "id = ?", (tx_id,))
     db.audit("update", "transaction", tx_id, update_data, source="api")
+    for cid in {row["card_id"], update_data.get("card_id")}:
+        if cid:
+            recompute_card_billing(cid)
     return jsonify({"id": tx_id, "status": "updated"})
 
 
@@ -213,6 +219,8 @@ def gastos_delete(tx_id):
         )
     db.delete("card_installments", "transaction_id = ?", (tx_id,))
     db.delete("transactions", "id = ?", (tx_id,))
+    if row["card_id"]:
+        recompute_card_billing(row["card_id"])
     db.audit("delete", "transaction", tx_id, source="api")
     return jsonify({"id": tx_id, "status": "deleted"})
 

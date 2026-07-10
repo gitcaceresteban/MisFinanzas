@@ -16,10 +16,14 @@
     </div>
 
     <!-- Stats -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="stat-card">
             <div class="stat-label">Total mensual</div>
             <div class="stat-value num text-rose-600 dark:text-rose-400">{{ total_month | clp }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Pendiente este mes</div>
+            <div class="stat-value num text-amber-600 dark:text-amber-400">{{ pending_month | clp }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Activos</div>

@@ -9,7 +9,7 @@ from database import db
 from modules.helpers import (
     safe_str, safe_float, safe_int, parse_money, today_iso, parse_date_cl
 )
-from modules.cards import create_installments
+from modules.cards import create_installments, recompute_card_billing
 
 bp = Blueprint("transactions", __name__)
 
@@ -137,6 +137,55 @@ def _handle_shared(tx_id: int, data: dict) -> str:
                 "status": "pendiente",
             })
         return f" · {len(participants)} cuenta(s) por cobrar creada(s)"
+
+
+def _sync_person_debt(tx_id: int, data: dict, create_flag: bool) -> str:
+    """Crea (o mantiene sincronizada) una cuenta por cobrar en person_debts
+    ligada a este gasto, cuando el usuario marca la casilla
+    'es un préstamo/gasto a favor de esta persona'.
+
+    Solo aplica a gastos (expense) con una persona asignada. Es idempotente:
+    no duplica si ya existe una deuda para esta transacción y persona. Si la
+    deuda ya tiene abonos, no se toca (para respetar el historial de pagos).
+    Este flujo es independiente del de 'gasto compartido' (_handle_shared),
+    que reparte por filas con share_person_id[]/share_amount[].
+    """
+    if data.get("type") != "expense" or not data.get("person_id"):
+        return ""
+    if not create_flag:
+        return ""
+    amount = data.get("amount") or 0
+    existing = db.query(
+        "SELECT * FROM person_debts WHERE related_transaction_id = ? AND person_id = ?",
+        (tx_id, data["person_id"]), one=True)
+    if existing:
+        # No tocar si ya tiene abonos registrados.
+        if (existing["paid_amount"] or 0) > 0:
+            return ""
+        db.update("person_debts", {
+            "original_amount": amount,
+            "pending_amount": amount,
+            "date": data.get("date"),
+            "description": data.get("description") or "Gasto",
+            "category_id": data.get("category_id"),
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        }, "id = ?", (existing["id"],))
+        db.audit("update", "person_debt", existing["id"], {"from_tx": tx_id})
+        return ""
+    new_debt = db.insert("person_debts", {
+        "person_id": data["person_id"],
+        "direction": "they_owe_me",
+        "original_amount": amount,
+        "pending_amount": amount,
+        "paid_amount": 0,
+        "date": data.get("date"),
+        "description": data.get("description") or "Gasto",
+        "category_id": data.get("category_id"),
+        "related_transaction_id": tx_id,
+        "status": "pendiente",
+    })
+    db.audit("create", "person_debt", new_debt, {"from_tx": tx_id})
+    return " · pendiente creado en la persona"
 
 
 def _save_attachment(file_storage) -> str:
@@ -316,10 +365,17 @@ def create():
                 (data["amount"], data["card_id"])
             )
 
+        # Recalcular el facturado de la tarjeta (refleja la compra nueva).
+        if data["card_id"]:
+            recompute_card_billing(data["card_id"])
+
         # Gasto compartido: crear cuentas por cobrar o cuenta del hogar
         shared_msg = _handle_shared(new_id, data)
+        # Préstamo/gasto a favor de una persona → cuenta por cobrar.
+        debt_msg = _sync_person_debt(new_id, data,
+                                     bool(request.form.get("create_person_debt")))
 
-        flash("Movimiento registrado" + shared_msg, "success")
+        flash("Movimiento registrado" + shared_msg + debt_msg, "success")
         return redirect(url_for("transactions.index"))
 
     default_type = safe_str(request.args.get("type")) or "expense"
@@ -378,8 +434,21 @@ def edit(tx_id):
         }
         db.update("transactions", data, "id = ?", (tx_id,))
         db.audit("update", "transaction", tx_id, data)
+        # Recalcular el facturado de las tarjetas afectadas (la anterior y la
+        # nueva, por si cambió de tarjeta o de monto).
+        for cid in {tx["card_id"], data["card_id"]}:
+            if cid:
+                recompute_card_billing(cid)
+        # Sincronizar la cuenta por cobrar ligada a este gasto (sin duplicar).
+        _sync_person_debt(tx_id, data, bool(request.form.get("create_person_debt")))
         flash("Movimiento actualizado", "success")
         return redirect(url_for("transactions.index"))
+
+    # ¿Ya existe una cuenta por cobrar creada desde este gasto? Para reflejar
+    # el estado de la casilla en el formulario de edición.
+    person_debt_checked = bool(db.query(
+        "SELECT id FROM person_debts WHERE related_transaction_id = ?",
+        (tx_id,), one=True))
 
     return render_template("transactions_form.html",
                            tx=tx,
@@ -391,7 +460,8 @@ def edit(tx_id):
                            people=people,
                            payment_methods=PAYMENT_METHODS,
                            types=TRANSACTION_TYPES,
-                           statuses=STATUSES)
+                           statuses=STATUSES,
+                           person_debt_checked=person_debt_checked)
 
 
 @bp.route("/<int:tx_id>/eliminar", methods=["POST"])
@@ -415,6 +485,9 @@ def remove(tx_id):
     # Eliminar cuotas asociadas
     db.delete("card_installments", "transaction_id = ?", (tx_id,))
     db.delete("transactions", "id = ?", (tx_id,))
+    # Recalcular el facturado de la tarjeta tras quitar la compra/cuotas.
+    if tx["card_id"]:
+        recompute_card_billing(tx["card_id"])
     db.audit("delete", "transaction", tx_id)
     flash("Movimiento eliminado", "info")
     return redirect(url_for("transactions.index"))

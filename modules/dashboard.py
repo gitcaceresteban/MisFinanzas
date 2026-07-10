@@ -350,10 +350,13 @@ def index():
     months_plan = compute_commitments()
     this_month_plan = months_plan[0] if months_plan else None
     spend_ceiling = this_month_plan["free"] if this_month_plan else 0
+    # Gasto variable que consume el techo: solo efectivo/débito (card_id IS NULL);
+    # el gasto a crédito ya está en committed (billed_amount / cuotas).
     variable_spent = db.query("""
         SELECT COALESCE(SUM(amount),0) AS t FROM transactions
         WHERE type='expense' AND status='pagado'
           AND strftime('%Y-%m', date)=?
+          AND card_id IS NULL
           AND transaction_type NOT IN ('debt_payment')
           AND (description IS NULL OR description NOT LIKE '[Recurrente]%')
     """, (ym_str,), one=True)["t"] or 0

@@ -60,13 +60,26 @@ def compute_commitments():
         if ym in ym_set:
             ym_set[ym]["loans"] += ev["amount"]
 
-    # Cuotas de tarjetas estimadas
+    # Cuotas de tarjetas estimadas. Se EXCLUYEN las cuotas del ciclo ya cerrado
+    # (estimated_date <= cierre de la tarjeta), porque esas ya están contadas en
+    # billed_amount → evita el doble conteo.
+    from modules.cards import billing_cycle_bounds
+    cycle_ends = {}
     for r in db.query("""
-        SELECT strftime('%Y-%m', estimated_date) AS ym, COALESCE(SUM(amount),0) AS t
-        FROM card_installments WHERE status != 'pagada' GROUP BY ym
+        SELECT ci.estimated_date AS est, ci.amount AS amount, ci.card_id AS card_id,
+               c.billing_day AS billing_day
+        FROM card_installments ci
+        JOIN credit_cards c ON c.id = ci.card_id
+        WHERE ci.status != 'pagada'
     """):
-        if r["ym"] in ym_set:
-            ym_set[r["ym"]]["cards"] += r["t"] or 0
+        cid = r["card_id"]
+        if cid not in cycle_ends:
+            cycle_ends[cid] = billing_cycle_bounds(r["billing_day"])[1].isoformat()
+        if not r["est"] or r["est"] <= cycle_ends[cid]:
+            continue  # ya incluida en billed_amount
+        ym = r["est"][:7]
+        if ym in ym_set:
+            ym_set[ym]["cards"] += r["amount"] or 0
 
     # Recurrentes mensuales activos (se repiten cada mes).
     # Se excluyen los reembolsables (cuentas de tíos): los pago pero me los
@@ -96,6 +109,15 @@ def compute_commitments():
     """, one=True)["t"] or 0
     ym_set[current]["billed"] = billed
 
+    # Gasto del ciclo EN CURSO (no facturado): se cierra y paga aprox. el mes
+    # próximo, así que se refleja ahí para no subestimar el pago de tarjeta.
+    unbilled = db.query("""
+        SELECT COALESCE(SUM(unbilled_amount),0) AS t FROM credit_cards
+        WHERE status='activa'
+    """, one=True)["t"] or 0
+    if unbilled and len(keys) > 1:
+        ym_set[keys[1][2]]["billed"] += unbilled
+
     income = get_monthly_income()
     months = []
     for (y, m, ym) in keys:
@@ -119,12 +141,16 @@ def index():
     today = date.today()
     ym = f"{today.year}-{today.month:02d}"
 
-    # Gasto variable ya realizado este mes (gastos normales, sin contar pagos
-    # de deuda ni recurrentes ya contabilizados como compromisos).
+    # Gasto variable ya realizado este mes que consume el "techo": solo lo que
+    # sale de efectivo/débito AHORA (card_id IS NULL). El gasto a crédito NO
+    # resta aquí porque ya está representado en committed (billed_amount /
+    # cuotas), y contarlo también sería restarlo dos veces. Se excluyen además
+    # los pagos de deuda y los recurrentes (ya contabilizados como compromisos).
     spent = db.query("""
         SELECT COALESCE(SUM(amount),0) AS t FROM transactions
         WHERE type='expense' AND status='pagado'
           AND strftime('%Y-%m', date)=?
+          AND card_id IS NULL
           AND transaction_type NOT IN ('debt_payment')
           AND (description IS NULL OR description NOT LIKE '[Recurrente]%')
     """, (ym,), one=True)["t"] or 0

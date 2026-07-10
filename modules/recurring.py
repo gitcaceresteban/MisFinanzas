@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from database import db
 from modules.helpers import safe_str, safe_float, safe_int, parse_money, today_iso
 from modules.uploads import save_image, serve_image
+from modules.cards import recompute_card_billing
 
 bp = Blueprint("recurring", __name__)
 
@@ -56,6 +57,13 @@ def index():
     today_day = date.today().day
     active = [p for p in payments if p["active"]]
     total_month = sum(p["amount"] for p in active if p["frequency"] == "monthly")
+    # Pendiente del mes: recurrentes mensuales activos aún NO pagados este mes.
+    # Se excluyen los reembolsables (cuentas de terceros que me devuelven), igual
+    # que en planning.py, porque no reducen mi capacidad real de gasto.
+    pending_month = sum(p["amount"] for p in active
+                        if p["frequency"] == "monthly"
+                        and not p["paid_this_month"]
+                        and not p.get("is_reimbursable"))
     upcoming = [p for p in active
                 if p["day_of_month"] and p["day_of_month"] >= today_day]
     overdue = [p for p in active
@@ -79,6 +87,7 @@ def index():
                           grouped=grouped,
                           group_names=group_names,
                           total_month=total_month,
+                          pending_month=pending_month,
                           active_count=len(active),
                           upcoming_count=len(upcoming),
                           overdue_count=len(overdue))
@@ -237,6 +246,7 @@ def register_payment(payment_id):
             "UPDATE credit_cards SET used_amount = used_amount + ? WHERE id = ?",
             (amount, p["card_id"])
         )
+        recompute_card_billing(p["card_id"])
 
     # Si es reembolsable (ej. cuenta de un tío que yo pago), generar una
     # cuenta por cobrar para que esa persona me devuelva el monto.
@@ -294,6 +304,7 @@ def cancel_payment(payment_id):
     if tx["card_id"]:
         db.execute("UPDATE credit_cards SET used_amount = used_amount - ? WHERE id = ?",
                    (tx["amount"], tx["card_id"]))
+        recompute_card_billing(tx["card_id"])
 
     # Quitar la cuenta por cobrar generada si sigue intacta (sin abonos)
     if p["is_reimbursable"] and p["person_id"]:

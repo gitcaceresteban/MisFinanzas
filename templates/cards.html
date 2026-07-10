@@ -81,6 +81,14 @@
                         </div>
                     {% endif %}
 
+                    {% if c.has_billed_debt and c.billed_amount and c.billed_amount > 0 %}
+                        <a href="/tarjetas/{{ c.id }}/pagar"
+                           class="flex items-center justify-between text-xs font-medium px-3 py-2 rounded-lg bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
+                            <span>💳 Facturado por pagar</span>
+                            <span class="num">{{ c.billed_amount | clp }}</span>
+                        </a>
+                    {% endif %}
+
                     <div class="flex gap-2 pt-2">
                         <a href="/tarjetas/{{ c.id }}" class="btn-secondary flex-1 justify-center text-xs">
                             <i data-lucide="eye" class="w-3.5 h-3.5"></i> Ver

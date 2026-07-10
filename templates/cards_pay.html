@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% block title %}Pagar facturado {{ card.name }}{% endblock %}
+{% block page_title %}Pagar facturado{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto">
+    <div class="mb-5">
+        <a href="/tarjetas/{{ card.id }}" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white inline-flex items-center gap-1">
+            <span>←</span> Volver a la tarjeta
+        </a>
+    </div>
+
+    <div class="card overflow-hidden">
+        <!-- Encabezado tipo app del banco -->
+        <div class="px-6 py-5 text-white flex items-center gap-3"
+             style="background: linear-gradient(135deg, {{ card.bank_color or '#4f46e5' }}, {{ card.bank_color or '#4f46e5' }}cc);">
+            {% if card.bank_logo %}
+                <img src="/bancos/logo/{{ card.bank_logo }}" alt="" class="w-11 h-11 rounded-xl bg-white/90 object-contain p-1">
+            {% else %}
+                <div class="w-11 h-11 rounded-xl bg-white/20 grid place-items-center text-2xl">💳</div>
+            {% endif %}
+            <div>
+                <div class="text-lg font-bold leading-tight">Pagar el facturado</div>
+                <div class="text-sm text-white/80">{{ card.name }} · {{ card.bank_name or '' }}</div>
+            </div>
+        </div>
+
+        {% if (card.billed_amount or 0) > 0 %}
+        <form method="POST" action="/tarjetas/{{ card.id }}/pagar"
+              data-confirm="¿Confirmas el pago del facturado? Se descontará de la cuenta seleccionada y las cuotas del ciclo pasarán a pagadas.">
+            <div class="p-6 space-y-1">
+                <div class="pay-row"><span>Tarjeta</span><span class="font-medium">{{ card.name }}</span></div>
+                <div class="pay-row"><span>Período facturado</span><span>{{ cycle_start | fecha }} — {{ cycle_end | fecha }}</span></div>
+                {% if card.payment_day %}
+                <div class="pay-row"><span>Vence el día</span><span class="num">{{ card.payment_day }}</span></div>
+                {% endif %}
+                <div class="pay-row pay-row-total">
+                    <span>Total facturado</span>
+                    <span class="num text-emerald-600 dark:text-emerald-400">{{ card.billed_amount | clp }}</span>
+                </div>
+            </div>
+
+            <!-- Detalle de lo que compone el facturado (para comparar con la cartola) -->
+            {% if installments or transactions %}
+            <div class="px-6 pb-2">
+                <details class="text-sm">
+                    <summary class="cursor-pointer text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white select-none">
+                        Ver detalle ({{ (installments | length) + (transactions | length) }} ítems)
+                    </summary>
+                    <div class="mt-3 space-y-1.5">
+                        {% for i in installments %}
+                        <div class="flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                            <span class="text-slate-600 dark:text-slate-300">
+                                Cuota {{ i.installment_number }}/{{ i.total_installments }}
+                                <span class="text-xs text-slate-400">· {{ i.estimated_date | fecha }}</span>
+                            </span>
+                            <span class="num font-medium">{{ i.amount | clp }}</span>
+                        </div>
+                        {% endfor %}
+                        {% for t in transactions %}
+                        <div class="flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                            <span class="text-slate-600 dark:text-slate-300 truncate">
+                                {{ t.description or 'Compra' }}
+                                <span class="text-xs text-slate-400">· {{ t.date | fecha }}</span>
+                            </span>
+                            <span class="num font-medium">{{ t.amount | clp }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </details>
+            </div>
+            {% endif %}
+
+            <div class="px-6 pb-6 space-y-4 border-t border-slate-100 dark:border-slate-800 pt-5">
+                <div>
+                    <label class="label">Elige tu forma de pago</label>
+                    {% if accounts %}
+                    <select name="account_id" class="select">
+                        <option value="">— No descontar de ninguna cuenta —</option>
+                        {% for a in accounts %}
+                            <option value="{{ a.id }}">{{ a.name }}{% if a.bank_name %} · {{ a.bank_name }}{% endif %} ({{ a.balance | clp }})</option>
+                        {% endfor %}
+                    </select>
+                    <p class="hint">Si eliges una cuenta, se descuenta el saldo y se registra el pago automáticamente.</p>
+                    {% else %}
+                    <p class="text-sm text-slate-500 dark:text-slate-400">No tienes cuentas activas. Se marcará el facturado como pagado sin descontar saldo.</p>
+                    {% endif %}
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="label">Monto a pagar</label>
+                        <input type="text" inputmode="numeric" name="amount" class="input money-input"
+                               value="{{ card.billed_amount or 0 }}" placeholder="0">
+                        <p class="hint">Por defecto el total. Puedes editar para un pago parcial.</p>
+                    </div>
+                    <div>
+                        <label class="label">Fecha de pago</label>
+                        <input type="date" name="date" class="input" value="{{ today }}">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary w-full justify-center text-base py-3">
+                    ✅ Pagar facturado · {{ card.billed_amount | clp }}
+                </button>
+            </div>
+        </form>
+        {% else %}
+        <div class="p-10 text-center">
+            <div class="text-5xl mb-3">🎉</div>
+            <h3 class="text-lg font-semibold">¡Sin facturado pendiente!</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Esta tarjeta no tiene un facturado por pagar en este momento.</p>
+            <a href="/tarjetas/{{ card.id }}" class="btn-secondary mt-5 inline-flex">Volver</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

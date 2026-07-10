@@ -65,6 +65,11 @@
                         </div>
                     {% endif %}
                 </div>
+                {% if card.billed_amount and card.billed_amount > 0 %}
+                <a href="/tarjetas/{{ card.id }}/pagar" class="btn-primary w-full justify-center">
+                    💳 <span>Pagar facturado · {{ card.billed_amount | clp }}</span>
+                </a>
+                {% endif %}
                 <div class="flex gap-2 pt-2">
                     <a href="/tarjetas/{{ card.id }}/editar" class="btn-secondary flex-1 justify-center">
                         <i data-lucide="edit-2" class="w-4 h-4"></i> Editar

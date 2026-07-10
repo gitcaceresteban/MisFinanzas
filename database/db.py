@@ -52,6 +52,10 @@ MIGRATIONS = [
     ("categories", "kind", "TEXT NOT NULL DEFAULT 'expense'"),
     ("banks", "logo_path", "TEXT"),
     ("credit_cards", "logo_path", "TEXT"),
+    # Hasta qué fecha (cierre de ciclo) se pagó el facturado. Permite que
+    # recompute_card_billing() no vuelva a contar como "facturado" las compras
+    # normales de un ciclo ya pagado.
+    ("credit_cards", "billed_paid_until", "TEXT"),
     ("loans", "payment_day", "INTEGER"),
     ("loans", "card_id", "INTEGER"),
     ("loans", "billed_in_card", "INTEGER NOT NULL DEFAULT 0"),

@@ -54,24 +54,9 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-            <input type="checkbox" name="has_billed_debt" id="has_billed_debt"
-                   {% if card and card.has_billed_debt %}checked{% endif %}
-                   class="w-4 h-4 rounded">
-            <label for="has_billed_debt" class="text-sm">Tiene deuda facturada por pagar</label>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="label">Monto facturado</label>
-                <input type="text" inputmode="numeric" name="billed_amount" class="input money-input"
-                       value="{{ card.billed_amount if card else 0 }}" placeholder="0">
-            </div>
-            <div>
-                <label class="label">Monto no facturado</label>
-                <input type="text" inputmode="numeric" name="unbilled_amount" class="input money-input"
-                       value="{{ card.unbilled_amount if card else 0 }}" placeholder="0">
-            </div>
+        <div class="flex items-start gap-2 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-500 dark:text-slate-400">
+            <span class="text-base leading-none">ℹ️</span>
+            <span>El <strong>facturado</strong> y el <strong>no facturado</strong> se calculan solos a partir de tus gastos y cuotas según el día de facturación. Para pagar el facturado usa el botón <strong>“Pagar facturado”</strong> en el detalle de la tarjeta.</span>
         </div>
 
         <div>

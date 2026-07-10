@@ -50,47 +50,68 @@ def index():
 
     # ---- Egresos proyectados ----
 
-    # 1) Tarjetas con facturado
+    # 1) Tarjetas: facturado (a pagar en el próximo vencimiento) y lo no
+    #    facturado del ciclo en curso (se paga aprox. el vencimiento siguiente).
     cards = db.query("""
-        SELECT id, name, payment_day, billed_amount, has_billed_debt
+        SELECT id, name, payment_day, billed_amount, unbilled_amount, has_billed_debt
         FROM credit_cards
-        WHERE status='activa' AND has_billed_debt=1
-              AND payment_day IS NOT NULL
-              AND billed_amount > 0
+        WHERE status='activa' AND payment_day IS NOT NULL
+              AND (billed_amount > 0 OR unbilled_amount > 0)
     """)
     for c in cards:
         d_iso = _next_day_with(c["payment_day"], today, end_date)
-        if not d_iso or d_iso not in days_data:
-            continue
-        # Si el facturado ya se pagó (total o parcialmente) en el mismo mes en
-        # que se proyecta el vencimiento, no lo contamos de nuevo: solo el resto.
-        # Así, si pagas por adelantado, deja de aparecer como flujo futuro.
-        proj_month = d_iso[:7]
-        paid = db.query("""
-            SELECT COALESCE(SUM(amount), 0) AS t FROM transactions
-            WHERE card_id = ? AND type = 'expense' AND status = 'pagado'
-                  AND transaction_type = 'debt_payment'
-                  AND strftime('%Y-%m', date) = ?
-        """, (c["id"], proj_month), one=True)["t"] or 0
-        remaining = max(0, (c["billed_amount"] or 0) - paid)
-        if remaining <= 0:
-            continue
-        days_data[d_iso]["outflows"] += remaining
-        days_data[d_iso]["events"].append({
-            "kind": "card",
-            "title": f"Pago tarjeta {c['name']}",
-            "amount": -remaining,
-        })
+        # Facturado en el próximo vencimiento
+        if (c["billed_amount"] or 0) > 0 and d_iso and d_iso in days_data:
+            # Si el facturado ya se pagó (total o parcialmente) en el mismo mes en
+            # que se proyecta el vencimiento, no lo contamos de nuevo: solo el resto.
+            proj_month = d_iso[:7]
+            paid = db.query("""
+                SELECT COALESCE(SUM(amount), 0) AS t FROM transactions
+                WHERE card_id = ? AND type = 'expense' AND status = 'pagado'
+                      AND transaction_type = 'debt_payment'
+                      AND strftime('%Y-%m', date) = ?
+            """, (c["id"], proj_month), one=True)["t"] or 0
+            remaining = max(0, (c["billed_amount"] or 0) - paid)
+            if remaining > 0:
+                days_data[d_iso]["outflows"] += remaining
+                days_data[d_iso]["events"].append({
+                    "kind": "card",
+                    "title": f"Pago tarjeta {c['name']}",
+                    "amount": -remaining,
+                })
+        # No facturado: se proyecta en el vencimiento del mes siguiente.
+        if (c["unbilled_amount"] or 0) > 0 and d_iso:
+            first_pd = date.fromisoformat(d_iso)
+            nxt = _add_one_month(date(first_pd.year, first_pd.month, 1))
+            last_day = calendar.monthrange(nxt.year, nxt.month)[1]
+            pd2 = date(nxt.year, nxt.month, min(c["payment_day"], last_day))
+            d2 = pd2.isoformat()
+            if today <= pd2 <= end_date and d2 in days_data:
+                days_data[d2]["outflows"] += c["unbilled_amount"]
+                days_data[d2]["events"].append({
+                    "kind": "card",
+                    "title": f"Pago tarjeta {c['name']} (ciclo en curso)",
+                    "amount": -c["unbilled_amount"],
+                })
 
-    # 2) Cuotas de tarjetas estimadas
+    # 2) Cuotas de tarjetas estimadas. Se excluyen las del ciclo ya cerrado
+    #    (estimated_date <= cierre de la tarjeta): esas ya van en el facturado (#1).
+    from modules.cards import billing_cycle_bounds
     inst_card = db.query("""
-        SELECT ci.estimated_date, ci.amount, c.name AS card_name
+        SELECT ci.estimated_date, ci.amount, ci.card_id, c.name AS card_name,
+               c.billing_day
         FROM card_installments ci
         JOIN credit_cards c ON c.id = ci.card_id
         WHERE ci.status != 'pagada'
               AND ci.estimated_date BETWEEN ? AND ?
     """, (today.isoformat(), end_date.isoformat()))
+    cycle_ends = {}
     for ci in inst_card:
+        cid = ci["card_id"]
+        if cid not in cycle_ends:
+            cycle_ends[cid] = billing_cycle_bounds(ci["billing_day"])[1].isoformat()
+        if ci["estimated_date"] <= cycle_ends[cid]:
+            continue  # ya incluida en billed_amount
         d_iso = ci["estimated_date"]
         if d_iso in days_data:
             days_data[d_iso]["outflows"] += ci["amount"]
