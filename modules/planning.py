@@ -43,8 +43,15 @@ def _month_keys(n=HORIZON_MONTHS):
 
 
 def compute_commitments():
-    """Devuelve compromisos (egresos comprometidos) por mes para el horizonte."""
-    keys = _month_keys()
+    """Devuelve compromisos (egresos comprometidos) por mes para el horizonte.
+
+    Aplica el 'desfase de sueldo': si te pagan en la segunda mitad del mes
+    (income_day >= 15), el sueldo de un mes cubre las obligaciones del mes
+    SIGUIENTE (que vencen antes del próximo pago). Por eso cada fila muestra el
+    ingreso del mes y las obligaciones que ese ingreso realmente financia.
+    """
+    # +1 mes de horizonte para poder mirar las obligaciones del mes siguiente.
+    keys = _month_keys(HORIZON_MONTHS + 1)
     ym_set = {k[2]: {"loans": 0, "cards": 0, "recurring": 0, "household": 0, "billed": 0}
               for k in keys}
 
@@ -91,11 +98,22 @@ def compute_commitments():
     for k in keys:
         ym_set[k[2]]["recurring"] = rec_total
 
-    # Cuentas del hogar pendientes con vencimiento (mi parte = total − lo que aportan otros)
+    # Cuentas del hogar pendientes con vencimiento. Solo cuenta MI parte neta =
+    # total − lo que aportan/me devuelven los participantes. Así, una cuenta que
+    # pago con mi tarjeta pero me reembolsan por completo (participantes cubren el
+    # 100%) queda en $0 y no infla mis compromisos.
     for r in db.query("""
-        SELECT strftime('%Y-%m', due_date) AS ym, COALESCE(SUM(amount),0) AS t
-        FROM household_bills
-        WHERE status IN ('pendiente','parcial','vencida') AND due_date IS NOT NULL
+        SELECT strftime('%Y-%m', due_date) AS ym,
+               COALESCE(SUM(CASE WHEN net > 0 THEN net ELSE 0 END), 0) AS t
+        FROM (
+            SELECT hb.due_date,
+                   hb.amount - COALESCE(
+                       (SELECT SUM(share_amount) FROM household_bill_participants
+                        WHERE bill_id = hb.id), 0) AS net
+            FROM household_bills hb
+            WHERE hb.status IN ('pendiente','parcial','vencida')
+                  AND hb.due_date IS NOT NULL
+        )
         GROUP BY ym
     """):
         if r["ym"] in ym_set:
@@ -118,18 +136,27 @@ def compute_commitments():
     if unbilled and len(keys) > 1:
         ym_set[keys[1][2]]["billed"] += unbilled
 
+    # Desfase de sueldo: si te pagan en la segunda mitad del mes, ese sueldo
+    # cubre las obligaciones del mes siguiente.
+    income_day = safe_int(get_setting("income_day", "27")) or 27
+    offset = 1 if income_day >= 15 else 0
+
     income = get_monthly_income()
     months = []
-    for (y, m, ym) in keys:
-        c = ym_set[ym]
-        committed = c["loans"] + c["cards"] + c["recurring"] + c["household"] + c["billed"]
+    for idx in range(HORIZON_MONTHS):
+        (y, m, ym) = keys[idx]
+        # Obligaciones que financia el sueldo de este mes (según el desfase).
+        src = ym_set[keys[idx + offset][2]]
+        committed = (src["loans"] + src["cards"] + src["recurring"]
+                     + src["household"] + src["billed"])
         months.append({
             "ym": ym, "year": y, "month": m,
             "label": f"{month_name_es(m, short=True)} {y}",
-            "loans": c["loans"], "cards": c["cards"], "recurring": c["recurring"],
-            "household": c["household"], "billed": c["billed"],
+            "loans": src["loans"], "cards": src["cards"], "recurring": src["recurring"],
+            "household": src["household"], "billed": src["billed"],
             "committed": committed, "income": income,
             "free": income - committed,
+            "offset": offset,
         })
     return months
 

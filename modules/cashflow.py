@@ -164,20 +164,28 @@ def index():
                     })
             cursor = _add_one_month(cursor)
 
-    # 5) Cuentas del hogar con fecha de vencimiento
+    # 5) Cuentas del hogar con fecha de vencimiento. Solo MI parte neta
+    #    (total − lo que aportan los participantes); si me reembolsan todo, no suma.
     bills = db.query("""
-        SELECT name, amount, due_date FROM household_bills
-        WHERE status IN ('pendiente','parcial','vencida')
-              AND due_date BETWEEN ? AND ?
+        SELECT hb.name, hb.due_date,
+               hb.amount - COALESCE(
+                   (SELECT SUM(share_amount) FROM household_bill_participants
+                    WHERE bill_id = hb.id), 0) AS net
+        FROM household_bills hb
+        WHERE hb.status IN ('pendiente','parcial','vencida')
+              AND hb.due_date BETWEEN ? AND ?
     """, (today.isoformat(), end_date.isoformat()))
     for b_ in bills:
+        net = b_["net"] or 0
+        if net <= 0:
+            continue
         d_iso = b_["due_date"]
         if d_iso in days_data:
-            days_data[d_iso]["outflows"] += b_["amount"]
+            days_data[d_iso]["outflows"] += net
             days_data[d_iso]["events"].append({
                 "kind": "household",
                 "title": b_["name"],
-                "amount": -b_["amount"],
+                "amount": -net,
             })
 
     # 6) Deudas por cobrar (entradas esperadas)

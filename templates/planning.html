@@ -33,21 +33,26 @@
 
         <!-- Plan del mes -->
         <div class="card-padded lg:col-span-2">
-            <div class="section-title mb-4">📅 Este mes — ¿cuánto puedo gastar?</div>
+            <div class="section-title mb-1">🧮 ¿Cuánto me queda para gastar?</div>
+            {% if this_month and this_month.offset %}
+            <p class="hint mb-4">💡 Te pagan el día {{ income_day }}, así que el sueldo de este mes se destina a las <strong>obligaciones del próximo mes</strong> (vencen antes del siguiente pago). Aquí reservamos esas obligaciones y te mostramos lo que queda libre. Para saber cuánto tienes disponible <em>hoy</em> en tus cuentas, mira el <a href="/flujo/" class="underline">Flujo de caja</a>.</p>
+            {% else %}
+            <p class="hint mb-4">Tu sueldo menos las obligaciones fijas del mes. Para el saldo real de tus cuentas hoy, mira el <a href="/flujo/" class="underline">Flujo de caja</a>.</p>
+            {% endif %}
             <div class="space-y-2">
-                <div class="pay-row"><span>Ingreso estimado</span><span class="num text-emerald-600 dark:text-emerald-400">{{ income | clp }}</span></div>
+                <div class="pay-row"><span>Ingreso estimado (sueldo)</span><span class="num text-emerald-600 dark:text-emerald-400">{{ income | clp }}</span></div>
                 {% if this_month %}
                 <div class="pay-row"><span>− Pagos recurrentes</span><span class="num">{{ this_month.recurring | clp }}</span></div>
                 <div class="pay-row"><span>− Cuotas de créditos</span><span class="num">{{ this_month.loans | clp }}</span></div>
                 <div class="pay-row"><span>− Cuotas de tarjetas</span><span class="num">{{ this_month.cards | clp }}</span></div>
-                <div class="pay-row"><span>− Tarjetas facturadas</span><span class="num">{{ this_month.billed | clp }}</span></div>
-                <div class="pay-row"><span>− Cuentas del hogar</span><span class="num">{{ this_month.household | clp }}</span></div>
+                <div class="pay-row"><span>− Facturación de tarjetas</span><span class="num">{{ this_month.billed | clp }}</span></div>
+                <div class="pay-row"><span>− Cuentas del hogar (mi parte)</span><span class="num">{{ this_month.household | clp }}</span></div>
                 {% endif %}
                 <div class="pay-row pay-row-total">
                     <span>Techo para gasto variable</span>
                     <span class="num {% if ceiling >= 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{{ ceiling | clp }}</span>
                 </div>
-                <div class="pay-row"><span>Ya gastado este mes</span><span class="num">{{ spent | clp }}</span></div>
+                <div class="pay-row"><span>Ya gastado este mes (efectivo/débito)</span><span class="num">{{ spent | clp }}</span></div>
                 <div class="flex items-center justify-between pt-2">
                     <span class="font-bold">Te queda para gastar</span>
                     <span class="text-xl font-bold num {% if remaining >= 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{{ remaining | clp }}</span>
@@ -59,7 +64,7 @@
     <!-- Simulador de escenarios -->
     <div class="card-padded" x-data="simulator()">
         <div class="section-title mb-1">🧪 Simulador: ¿qué pasa si compro en cuotas?</div>
-        <p class="hint mb-4">Prueba una compra antes de hacerla y mira cómo afecta tu disponible de los próximos meses.</p>
+        <p class="hint mb-4">Prueba una compra antes de hacerla y mira cómo afecta tu disponible de los próximos meses. El <strong>comprometido</strong> de cada mes ya considera el desfase de tu sueldo (lo que ese ingreso debe cubrir).</p>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <div>
